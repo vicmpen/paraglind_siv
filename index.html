@@ -228,21 +228,31 @@ const TRIM_AOA = 0.06;        // rad ~ 3.5° trim AoA
 const TRIM_SPEED = 10;        // m/s nominal trim airspeed
 const FORCE_SCALE = 1e-6;     // Matter.js force unit scaling for Newtons
 
-// Lookup: stall envelope tuned so trim equilibrium ≈ 10 m/s, ~ -1.2 m/s sink
+// Lookup: stall envelope tuned so trim equilibrium ≈ 10 m/s, ~ -1.2 m/s sink.
+// Cambered airfoil with zero-lift at α ≈ -3° and stall peak ~14°.
+const ZERO_LIFT_ALPHA = -0.05; // rad, ~ -2.9°
 function CL(alpha) {
-  // alpha in radians. Negative below zero-lift; ramps to peak near +12°; sharp stall.
   const a = alpha;
-  if (a < -0.15) return -0.4;
-  if (a < 0)    return -0.4 + (a + 0.15) * (0.4 / 0.15);
-  if (a < 0.21) return 5.5 * a;                          // linear, peaks ~1.16
-  if (a < 0.32) return 1.16 - (a - 0.21) * (0.85 / 0.11); // sharp stall drop
+  const slope = 5.7; // /rad — typical paraglider lift-curve slope
+  if (a < -0.22) return -0.35;
+  if (a < ZERO_LIFT_ALPHA) {
+    // Softer slope below zero-lift
+    return slope * (a - ZERO_LIFT_ALPHA) * 0.55;
+  }
+  // Linear region up to stall peak at α ≈ 14° → CL ≈ 1.08
+  const stallStart = 0.24; // 13.7°
+  if (a < stallStart) return slope * (a - ZERO_LIFT_ALPHA);
+  // Sharp stall drop to 0.35 at α = 25°
+  const stallEnd = 0.44;
+  const peakCL = slope * (stallStart - ZERO_LIFT_ALPHA);
+  if (a < stallEnd) return peakCL - (a - stallStart) * ((peakCL - 0.35) / (stallEnd - stallStart));
   if (a < 1.57) return 0.30;                              // deep stall plateau
   if (a < 3.14) return -0.30;                             // backfly
   return 0.0;
 }
 function CD(alpha, extraDrag) {
   const cl = CL(alpha);
-  const cd0 = 0.05 + (extraDrag || 0);
+  const cd0 = 0.045 + (extraDrag || 0);
   return cd0 + 0.045 * cl * cl;
 }
 
@@ -251,9 +261,9 @@ let engine, world, wing, pilot, lines;
 function setupWorld() {
   engine = Engine.create({
     enableSleeping: false,
-    positionIterations: 10,
-    velocityIterations: 10,
-    constraintIterations: 6
+    positionIterations: 24,
+    velocityIterations: 16,
+    constraintIterations: 12
   });
   world = engine.world;
   world.gravity.x = 0;
@@ -263,51 +273,61 @@ function setupWorld() {
   // Build wing as a slender rectangle. Visual deformation is layered on top.
   wing = Bodies.rectangle(0, -LINE_LENGTH, WING_CHORD, 0.3, {
     mass: WING_MASS,
-    frictionAir: 0.02, // small angular damping for realistic pitch response
-    restitution: 0
+    frictionAir: 0.06, // angular damping for stable pitch response (Matter.js conflates linear and angular here, this is fine for our scales)
+    restitution: 0,
+    slop: 0.005
   });
   Body.setMass(wing, WING_MASS);
-  Body.setInertia(wing, 90); // higher effective inertia for stable pitch dynamics
+  Body.setInertia(wing, 120); // high effective inertia for stable pitch dynamics
 
   pilot = Bodies.rectangle(0, 0, 0.6, 1.0, {
     mass: PILOT_MASS,
     frictionAir: 0,
-    restitution: 0
+    restitution: 0,
+    slop: 0.005
   });
   Body.setMass(pilot, PILOT_MASS);
 
-  // Wing initial pitch: near level — physics will find its own trim
-  Body.setAngle(wing, 0);
+  // Two suspension constraints: A-lines (forward) and D-lines (rear).
+  // Geometry tuned so initial position is at rest (line length matches actual distance).
+  const wingFwdAttach = { x:  WING_CHORD * 0.35, y: 0.15 };
+  const wingRearAttach = { x: -WING_CHORD * 0.35, y: 0.15 };
+  const pilotFwdAttach = { x:  0.15, y: -0.5 };
+  const pilotRearAttach = { x: -0.15, y: -0.5 };
+  // For initial wing at (0, yWing) and pilot at (0, 0) with both at angle 0:
+  //   distance² = (wing.x - pilot.x)² + (wing.y - pilot.y)²
+  //   wing.x = WING_CHORD*0.35,  pilot.x = 0.15  → dx = 0.69
+  //   distance² = 0.69² + dy² = LINE_LENGTH²
+  //   dy² = LINE_LENGTH² - 0.476  →  dy = sqrt(49 - 0.476) = 6.965
+  // wing center y = pilot_attach_y + (-dy) - wing_attach_y = -0.5 - 6.965 - 0.15 = -7.615
+  const wingInitY = -7.615;
+  Body.setPosition(wing, { x: 0, y: wingInitY });
+  // Initial pitch: slight nose-up so AoA is positive at start.
+  // Aerodynamic convention: pitch angle (chord vs horizontal). Negative wing.angle = nose-up (clockwise = nose-down in Matter +y down).
+  Body.setAngle(wing, -0.035); // ~ -2° nose-up
 
-  // Suspension lines: two stiff constraints, one to each wingtip-ish point
   lines = [
     Constraint.create({
-      bodyA: wing,  pointA: { x: -WING_CHORD * 0.25, y: 0.1 },
-      bodyB: pilot, pointB: { x: -0.25, y: -0.5 },
-      length: LINE_LENGTH, stiffness: 0.95, damping: 0.05
+      bodyA: wing,  pointA: wingFwdAttach,
+      bodyB: pilot, pointB: pilotFwdAttach,
+      length: LINE_LENGTH, stiffness: 1.0, damping: 0.08
     }),
     Constraint.create({
-      bodyA: wing,  pointA: { x:  WING_CHORD * 0.25, y: 0.1 },
-      bodyB: pilot, pointB: { x:  0.25, y: -0.5 },
-      length: LINE_LENGTH, stiffness: 0.95, damping: 0.05
-    }),
-    Constraint.create({
-      bodyA: wing,  pointA: { x: -WING_CHORD * 0.45, y: 0.1 },
-      bodyB: pilot, pointB: { x: -0.1, y: -0.5 },
-      length: LINE_LENGTH * 1.04, stiffness: 0.85, damping: 0.05
-    }),
-    Constraint.create({
-      bodyA: wing,  pointA: { x:  WING_CHORD * 0.45, y: 0.1 },
-      bodyB: pilot, pointB: { x:  0.1, y: -0.5 },
-      length: LINE_LENGTH * 1.04, stiffness: 0.85, damping: 0.05
-    }),
+      bodyA: wing,  pointA: wingRearAttach,
+      bodyB: pilot, pointB: pilotRearAttach,
+      length: LINE_LENGTH, stiffness: 1.0, damping: 0.08
+    })
   ];
 
   Composite.add(world, [wing, pilot, ...lines]);
 
-  // Kick-start with forward speed so we don't start with zero-airflow stall
-  Body.setVelocity(wing, { x: TRIM_SPEED * (1/60), y: 0.4 * (1/60) });
-  Body.setVelocity(pilot, { x: TRIM_SPEED * (1/60), y: 0.4 * (1/60) });
+  // Initial velocity along glide path (6° descent at ~10 m/s)
+  const glide = 6 * Math.PI / 180;
+  const v0x = TRIM_SPEED * Math.cos(glide);
+  const v0y = TRIM_SPEED * Math.sin(glide);
+  // Matter.js velocity is "per integration step". With dt = 1/60 s, m/s ÷ 60 gives per-frame.
+  Body.setVelocity(wing,  { x: v0x / 60, y: v0y / 60 });
+  Body.setVelocity(pilot, { x: v0x / 60, y: v0y / 60 });
 }
 
 // Convert Matter velocity (units per frame at 60Hz) to m/s
@@ -727,35 +747,17 @@ function applyAerodynamics(dtSec) {
   const Fy = liftMag * liftDirY + dragMag * dragDirY;
   applyForceN(wing, wing.position, Fx, Fy);
 
-  // Pitch moment from brake (brake pulls trailing edge down → pitches nose up → wing.angle DECREASES, i.e. anti-clockwise on screen)
-  // Apply equivalent force at trailing edge of wing in body frame.
-  const trailLocal = Vector.rotate({ x: -WING_CHORD * 0.45, y: 0 }, wing.angle);
-  const trailWorld = Vector.add(wing.position, trailLocal);
-  // Force in body frame: downward in body (y body), then rotate to world
-  const brakeForceMag = smoothed.brake * 260; // Newtons, tunable; produces realistic pitch authority
-  const brakeForceLocal = Vector.rotate({ x: 0, y: brakeForceMag }, wing.angle);
-  applyForceN(wing, trailWorld, brakeForceLocal.x, brakeForceLocal.y);
-
-  // Speed bar: applies force at leading edge pulling DOWN in body frame → pitches nose down
-  const leadLocal = Vector.rotate({ x:  WING_CHORD * 0.45, y: 0 }, wing.angle);
-  const leadWorld = Vector.add(wing.position, leadLocal);
-  const sbForceMag = smoothed.speedBar * 180;
-  const sbForceLocal = Vector.rotate({ x: 0, y: sbForceMag }, wing.angle);
-  applyForceN(wing, leadWorld, sbForceLocal.x, sbForceLocal.y);
-
-  // C-riser pull: applies force at trailing-edge-ish region, deep stall
-  if (smoothed.cRiser > 0.05) {
-    const cForceMag = smoothed.cRiser * 500;
-    const cForceLocal = Vector.rotate({ x: 0, y: cForceMag }, wing.angle);
-    applyForceN(wing, trailWorld, cForceLocal.x, cForceLocal.y);
-  }
-
-  // A-pull collapse force (briefly tucks the leading edge)
-  if (smoothed.aPull > 0.05) {
-    const aForceMag = smoothed.aPull * 900;
-    const aForceLocal = Vector.rotate({ x: 0, y: aForceMag }, wing.angle);
-    applyForceN(wing, leadWorld, aForceLocal.x, aForceLocal.y);
-  }
+  // Pitch moments applied as PURE torques so they don't introduce spurious translational forces.
+  // (In reality, line tension creating these moments is internal to the wing+pilot system.)
+  // Sign convention: positive Matter torque = clockwise on screen = aerodynamic nose-DOWN.
+  // Brake → trailing edge pulled down → nose UP → negative torque.
+  const brakeTorqueNm  = -smoothed.brake * 160;       // N·m, full brake
+  const speedBarNm     =  smoothed.speedBar * 80;     // nose-down moment
+  const cRiserNm       = -smoothed.cRiser * 240;      // strong nose-up (stall)
+  const aPullNm        =  smoothed.aPull * 300;       // sharp nose-down (frontal trigger)
+  const totalTorqueNm  = brakeTorqueNm + speedBarNm + cRiserNm + aPullNm;
+  // Matter torque is in same scaled units as force (offset.x * force.y - offset.y * force.x).
+  wing.torque += totalTorqueNm * FORCE_SCALE;
 
   // Save aero stats for instruments
   lastAero.alpha = alpha;
@@ -1348,21 +1350,27 @@ function resetWorld() {
 }
 
 // ---- Main loop ----
+const FIXED_DT_MS = 1000 / 60;
+let simAccumulatorMs = 0;
 function loop(now) {
   if (!lastFrame) lastFrame = now;
-  let dtMs = (now - lastFrame);
-  if (dtMs > 80) dtMs = 80; // cap
+  let realDtMs = (now - lastFrame);
+  if (realDtMs > 100) realDtMs = 100;
   lastFrame = now;
-  const dtSec = dtMs / 1000 * timeScale;
-  const dtSimMs = dtMs * timeScale;
 
   if (playing) {
-    tickPhases(dtSimMs);
-    tickInputSmoothing(dtSec);
-    applyAerodynamics(dtSec);
-    applyPilotShift(dtSec);
-    // Step physics
-    Engine.update(engine, Math.min(33, dtSimMs));
+    // Run fixed-timestep sub-steps so body.velocity stays in consistent units (per 1/60 s).
+    simAccumulatorMs += realDtMs * timeScale;
+    let steps = 0;
+    while (simAccumulatorMs >= FIXED_DT_MS && steps < 6) {
+      tickPhases(FIXED_DT_MS);
+      tickInputSmoothing(FIXED_DT_MS / 1000);
+      applyAerodynamics(FIXED_DT_MS / 1000);
+      Engine.update(engine, FIXED_DT_MS);
+      simAccumulatorMs -= FIXED_DT_MS;
+      steps++;
+    }
+    if (steps === 6) simAccumulatorMs = 0; // bail out on huge gaps
   }
   updateCamera();
   drawScene();
