@@ -1,0 +1,2048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIV Maneuver Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800&family=DM+Sans:wght@300;400;500;700&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #07101e;
+    --bg-panel: #0e1a2e;
+    --bg-elev: #15243d;
+    --border: #1f3354;
+    --border-soft: #182842;
+    --text: #e6ecf5;
+    --text-dim: #8a9bb5;
+    --text-faint: #5a6c87;
+    --amber: #e8b04e;
+    --amber-bright: #f5c977;
+    --sky-blue: #6cb4ee;
+    --red: #e15a5a;
+    --green: #7fc88a;
+    --wing: #f1ede2;
+    --wing-shadow: #b9b4a7;
+    --harness: #c14747;
+    --line: #93a3b8;
+    --sky-top: #1a2840;
+    --sky-mid: #2e4870;
+    --sky-bottom: #486d9c;
+    --ground: #2a1f15;
+    --ground-far: #3a2f25;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg-deep);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body {
+    background:
+      radial-gradient(ellipse at top left, rgba(232,176,78,0.05) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(108,180,238,0.04) 0%, transparent 50%),
+      var(--bg-deep);
+    padding: 24px;
+  }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border-soft);
+    position: relative;
+  }
+
+  header::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: -1px;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 2px;
+    background: var(--amber);
+  }
+
+  .pretitle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.35em;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  header h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-size: clamp(32px, 5vw, 56px);
+    line-height: 1;
+    font-variation-settings: "opsz" 144;
+    letter-spacing: -0.02em;
+  }
+
+  header h1 em {
+    font-style: italic;
+    font-weight: 600;
+    color: var(--amber);
+  }
+
+  header .subtitle {
+    color: var(--text-dim);
+    margin-top: 12px;
+    font-size: 14px;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.6;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 920px) {
+    .app { grid-template-columns: 1fr; }
+  }
+
+  .sidebar {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    padding: 20px;
+    height: fit-content;
+    position: sticky;
+    top: 24px;
+  }
+
+  .sidebar h2 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .category {
+    margin-bottom: 18px;
+  }
+
+  .category-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--amber);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    padding-left: 4px;
+  }
+
+  .maneuver-list {
+    list-style: none;
+  }
+
+  .maneuver-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    padding: 8px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    transition: all 0.15s ease;
+    margin-bottom: 2px;
+    position: relative;
+  }
+
+  .maneuver-item:hover {
+    background: var(--bg-elev);
+    color: var(--text);
+    border-color: var(--border-soft);
+  }
+
+  .maneuver-item.active {
+    background: rgba(232,176,78,0.08);
+    color: var(--amber-bright);
+    border-color: rgba(232,176,78,0.3);
+  }
+
+  .maneuver-item.active::before {
+    content: '►';
+    position: absolute;
+    left: -2px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 8px;
+    color: var(--amber);
+  }
+
+  main {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .viz {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    padding: 16px;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 720px) {
+    .viz { grid-template-columns: 1fr; }
+  }
+
+  .view {
+    position: relative;
+    background: var(--bg-elev);
+    border-radius: 3px;
+    overflow: hidden;
+    aspect-ratio: 5/4;
+  }
+
+  .view svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .view-label {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--amber);
+    text-transform: uppercase;
+    background: rgba(7,16,30,0.6);
+    padding: 4px 8px;
+    border-radius: 2px;
+    backdrop-filter: blur(4px);
+    z-index: 10;
+  }
+
+  .view-corner {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-faint);
+    z-index: 10;
+  }
+
+  .instruments {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  @media (max-width: 720px) {
+    .instruments { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .instrument {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 3px;
+    padding: 14px 16px;
+    position: relative;
+  }
+
+  .instrument-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .instrument-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+
+  .instrument-value.warn { color: var(--amber); }
+  .instrument-value.danger { color: var(--red); }
+
+  .instrument-unit {
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-left: 4px;
+  }
+
+  .description {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    padding: 20px 24px;
+  }
+
+  .desc-header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .desc-phase-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    color: var(--text-faint);
+    text-transform: uppercase;
+  }
+
+  .desc-phase-name {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-style: italic;
+    font-size: 22px;
+    color: var(--amber-bright);
+  }
+
+  .desc-progress {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-faint);
+  }
+
+  .desc-text {
+    color: var(--text-dim);
+    line-height: 1.7;
+    font-size: 14px;
+  }
+
+  .desc-maneuver-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--text);
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+
+  .desc-maneuver-tagline {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-bottom: 16px;
+    line-height: 1.6;
+    border-bottom: 1px solid var(--border-soft);
+    padding-bottom: 14px;
+  }
+
+  .rule-card {
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: rgba(232,176,78,0.06);
+    border-left: 2px solid var(--amber);
+    border-radius: 0 3px 3px 0;
+    font-size: 12.5px;
+    color: var(--amber-bright);
+    line-height: 1.6;
+    display: none;
+  }
+
+  .rule-card.visible { display: block; }
+
+  .rule-card strong {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--amber);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    padding: 14px 18px;
+  }
+
+  .btn {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: all 0.15s ease;
+  }
+
+  .btn:hover {
+    background: var(--border);
+    border-color: var(--amber);
+  }
+
+  .btn.primary {
+    background: var(--amber);
+    color: var(--bg-deep);
+    border-color: var(--amber);
+    font-weight: 700;
+  }
+
+  .btn.primary:hover {
+    background: var(--amber-bright);
+  }
+
+  .speed-control {
+    margin-left: auto;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .speed-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.15em;
+    margin-right: 4px;
+  }
+
+  .speed-btn {
+    background: transparent;
+    border: 1px solid var(--border-soft);
+    color: var(--text-dim);
+    padding: 4px 10px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    transition: all 0.15s ease;
+  }
+
+  .speed-btn.active {
+    border-color: var(--amber);
+    color: var(--amber);
+    background: rgba(232,176,78,0.08);
+  }
+
+  .timeline {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    padding: 14px 18px;
+  }
+
+  .timeline-header {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-faint);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .timeline-track {
+    display: flex;
+    gap: 2px;
+    height: 28px;
+  }
+
+  .timeline-phase {
+    flex: 1;
+    background: var(--bg-elev);
+    border-radius: 2px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .timeline-phase:hover {
+    background: var(--border);
+  }
+
+  .timeline-phase.active {
+    background: rgba(232,176,78,0.15);
+  }
+
+  .timeline-phase.completed {
+    background: rgba(232,176,78,0.4);
+  }
+
+  .timeline-phase-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    background: var(--amber);
+    width: 0%;
+    transition: width 0.05s linear;
+  }
+
+  .timeline-phase-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    z-index: 2;
+    pointer-events: none;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .timeline-phase.active .timeline-phase-label,
+  .timeline-phase.completed .timeline-phase-label {
+    color: var(--amber-bright);
+  }
+
+  footer {
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-soft);
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 12px;
+    line-height: 1.7;
+  }
+
+  footer em {
+    color: var(--amber);
+    font-style: normal;
+  }
+
+  .sky-bg { fill: url(#sky-gradient); }
+  .ground-bg { fill: url(#ground-gradient); }
+  .horizon-line { stroke: rgba(232,176,78,0.3); stroke-width: 1; stroke-dasharray: 2 4; }
+  .wing-shape { fill: var(--wing); stroke: var(--wing-shadow); stroke-width: 0.5; }
+  .wing-shadow { fill: var(--wing-shadow); opacity: 0.3; }
+  .wing-cell-line { stroke: rgba(0,0,0,0.15); stroke-width: 0.5; fill: none; }
+  .wing-collapse-area { fill: rgba(50,40,30,0.5); }
+  .suspension-line { stroke: var(--line); stroke-width: 0.6; fill: none; opacity: 0.7; }
+  .suspension-line.twisted { stroke: var(--red); stroke-width: 0.9; opacity: 0.85; }
+  .pilot-body { fill: var(--harness); }
+  .pilot-head { fill: #d6b78d; }
+  .speed-indicator { stroke: var(--sky-blue); stroke-width: 1; fill: none; opacity: 0.5; }
+
+  .cloud { fill: rgba(255,255,255,0.05); }
+  .terrain-far { fill: rgba(60,55,45,0.5); }
+
+  .annotation {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    fill: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .annotation-line {
+    stroke: var(--amber);
+    stroke-width: 0.5;
+    stroke-dasharray: 1 2;
+    opacity: 0.6;
+    fill: none;
+  }
+
+  .motion-line {
+    stroke: rgba(255,255,255,0.2);
+    stroke-width: 1;
+    stroke-linecap: round;
+  }
+
+  .yaw-indicator {
+    fill: none;
+    stroke: var(--amber);
+    stroke-width: 1.5;
+  }
+
+  .yaw-arrow {
+    fill: var(--amber);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="pretitle">Paragliding Greece · Fly &amp; Fun</div>
+    <h1>SIV Maneuver <em>Simulator</em></h1>
+    <p class="subtitle">An interactive visualization of paragliding incident maneuvers — based on the SIV manual by Stavros Kostoulas (Fly &amp; Fun, May 2026 edition). Shows how the wing and pilot move relative to each other, the horizon and the ground. Educational use only.</p>
+  </header>
+
+  <div class="app">
+    <aside class="sidebar">
+      <h2>Maneuvers</h2>
+      <div id="maneuver-categories"></div>
+    </aside>
+
+    <main>
+      <div class="viz">
+        <div class="view">
+          <span class="view-label">Side View · Pitch Axis</span>
+          <span class="view-corner" id="side-corner">↓ Descent / → Direction</span>
+          <svg id="side-svg" viewBox="0 0 500 400" preserveAspectRatio="xMidYMid slice"></svg>
+        </div>
+        <div class="view">
+          <span class="view-label">Front View · Roll &amp; Shape</span>
+          <span class="view-corner" id="front-corner">Bank &amp; collapse</span>
+          <svg id="front-svg" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice"></svg>
+        </div>
+      </div>
+
+      <div class="instruments">
+        <div class="instrument">
+          <div class="instrument-label">Descent Rate</div>
+          <div class="instrument-value" id="instr-descent">-1.2<span class="instrument-unit">m/s</span></div>
+        </div>
+        <div class="instrument">
+          <div class="instrument-label">Bank Angle</div>
+          <div class="instrument-value" id="instr-bank">0°</div>
+        </div>
+        <div class="instrument">
+          <div class="instrument-label">Pitch</div>
+          <div class="instrument-value" id="instr-pitch">0°</div>
+        </div>
+        <div class="instrument">
+          <div class="instrument-label">G-Load</div>
+          <div class="instrument-value" id="instr-g">1.0<span class="instrument-unit">g</span></div>
+        </div>
+      </div>
+
+      <div class="timeline">
+        <div class="timeline-header">Phase Timeline</div>
+        <div class="timeline-track" id="timeline-track"></div>
+      </div>
+
+      <div class="description">
+        <div class="desc-maneuver-title" id="man-title">Pitch Control</div>
+        <div class="desc-maneuver-tagline" id="man-tagline">The foundation of active piloting — controlling the wing's pendulum motion on the pitch axis.</div>
+        <div class="desc-header">
+          <span class="desc-phase-label">Phase</span>
+          <span class="desc-phase-name" id="phase-name">Trim Flight</span>
+          <span class="desc-progress" id="phase-progress">01 / 06</span>
+        </div>
+        <p class="desc-text" id="phase-text">Wing flies stably above the pilot at trim speed.</p>
+        <div class="rule-card" id="rule-card"><strong>Golden Rule</strong><span id="rule-text"></span></div>
+      </div>
+
+      <div class="controls">
+        <button class="btn primary" id="btn-play">▶ Play</button>
+        <button class="btn" id="btn-restart">⟲ Restart</button>
+        <div class="speed-control">
+          <span class="speed-label">Speed</span>
+          <button class="speed-btn" data-speed="0.5">0.5x</button>
+          <button class="speed-btn active" data-speed="1">1x</button>
+          <button class="speed-btn" data-speed="2">2x</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <footer>
+    <strong>⚠ Educational visualization only.</strong> This simulator is a schematic representation — actual paraglider behavior depends on wing class, loading, conditions and pilot input. <em>Never attempt these maneuvers without certified instructor supervision, proper altitude and a dedicated SIV environment (typically over water with rescue boat).</em>
+  </footer>
+</div>
+
+<script>
+// ============================================================
+// SIV MANEUVER SIMULATOR — refined against Kostoulas SIV manual
+// ============================================================
+
+function P(name, duration, targets, text) {
+  return { name, duration, targets, text };
+}
+
+const STATE_DEFAULT = {
+  wing: {
+    pitch: 0, roll: 0,
+    leftEar: 0, rightEar: 0,
+    leftCol: 0, rightCol: 0,
+    frontal: 0, bStall: 0, paraStall: 0,
+    horseshoe: 0, cravatte: 0,
+    riserTwist: 0
+  },
+  pilot: {
+    swingX: 0, lean: 0,
+    brakeL: 0, brakeR: 0, speedBar: 0,
+    cBrake: 0
+  },
+  world: {
+    descentRate: 1.2, yawRate: 0,
+    gLoad: 1.0, forwardSpeed: 10
+  }
+};
+
+const MANEUVERS = {
+  pitch_control: {
+    name: 'Pitch Control',
+    category: 'Active Piloting',
+    tagline: 'The most important skill of active piloting — keeping the wing stable overhead by neutralising its tendency to dive (surge) or hang back.',
+    rule: 'Wing BEHIND vertical → hands UP (give it speed). Wing FORWARD of vertical → BRAKE (stop the surge).',
+    phases: [
+      P('Trim Flight', 1800,
+        { pitch:0, descentRate:1.2, forwardSpeed:10 },
+        'Wing flies stably above the pilot at trim speed — hands up, brakes released. The wing is centered over the pilot\'s head; this is the neutral reference state.'),
+      P('Progressive Brake', 1800,
+        { pitch:-15, brakeL:0.7, brakeR:0.7, descentRate:1.5, forwardSpeed:5 },
+        'Pilot pulls both brakes progressively. The wing slows and hangs BACK behind the pilot — kinetic energy is stored in the system like a stretched pendulum.'),
+      P('Brakes Released', 200,
+        { pitch:-15, brakeL:0, brakeR:0, descentRate:1.8, forwardSpeed:6 },
+        'Pilot releases brakes acutely — hands up. The wing is now behind, primed to surge forward.'),
+      P('SURGE Forward', 1200,
+        { pitch:35, brakeL:0, brakeR:0, descentRate:2.2, forwardSpeed:14 },
+        'Wing dives forward dynamically and accelerates past vertical. The pilot is momentarily behind. This is the moment of maximum airspeed — timing the check is everything.'),
+      P('CHECK · Symmetric Brake', 600,
+        { pitch:30, brakeL:0.5, brakeR:0.5, descentRate:1.8, forwardSpeed:11 },
+        'Pilot applies a deep, sharp, symmetric brake exactly as the wing passes vertical at maximum speed. Without this check a frontal collapse is inevitable. The check is a momentary action.'),
+      P('Release & Recover', 1400,
+        { pitch:0, brakeL:0, brakeR:0, descentRate:1.2, forwardSpeed:10 },
+        'Once forward momentum is arrested, hands return UP immediately. Holding the brake too long stops the wing completely — it falls back again, creating a new, more violent oscillation.')
+    ]
+  },
+
+  big_ears: {
+    name: 'Big Ears',
+    category: 'Rapid Descent',
+    tagline: 'The most pilot-friendly rapid descent. Folding the outer wingtips reduces useful area, raises wing loading and increases drag.',
+    rule: 'SOP — IN: Ear → Ear → Speed Bar. OUT: Speed Bar → Ear → Ear → (Pump if needed). NEVER pull brakes while ears are in.',
+    phases: [
+      P('Normal Flight', 1500,
+        { descentRate:1.2 },
+        'Cruise flight. Both brakes stay in the hands (do NOT wrap them). The SOP order is A→E, E→A: ears first IN, speed bar second.'),
+      P('Pull Left Outer A', 800,
+        { leftEar:1, descentRate:2.5, forwardSpeed:9 },
+        'With brakes in the hands, pilot grabs the outermost A-riser (baby-A) on the LEFT side and pulls it down. The outer cells of the left tip fold inward. Sequential — never both simultaneously, to prevent a sudden dive or frontal.'),
+      P('Pull Right Outer A', 800,
+        { rightEar:1, descentRate:3.5, forwardSpeed:8 },
+        'Now the right baby-A. Wing area is reduced; angle of attack rises so the wing flies slightly nose-up and slower.'),
+      P('Engage Speed Bar', 1200,
+        { speedBar:0.4, descentRate:5.0, forwardSpeed:13, pitch:5 },
+        'Speed bar engaged 25–50%. This RESTORES safe angle of attack and gives horizontal speed to escape strong lift. Direction is controlled by weight-shift only — NEVER use brakes with ears in (stall risk).'),
+      P('Stable Descent', 1500,
+        { speedBar:0.4, descentRate:5.0 },
+        'Stable, controllable rapid descent. Wing remains pressurised. Weight-shift turns are smooth. Avoid landing this way — the wing has less energy available for the flare.'),
+      P('Release Speed Bar', 800,
+        { speedBar:0, descentRate:4.0, pitch:0 },
+        'Speed bar OFF first, smoothly. Releasing ears while still on speed bar can cause an asymmetric forward dive as the wing regains full surface.'),
+      P('Release Ears', 1200,
+        { leftEar:0, rightEar:0, descentRate:1.2, forwardSpeed:10 },
+        'Outer A-risers released, also sequentially. Wingtips reopen — most wings open on their own; if one stays closed, a single deep decisive pump with the corresponding brake will reopen it. Confirm normal flight by checking airspeed and horizon.')
+    ]
+  },
+
+  really_big_ears: {
+    name: 'Really Big Ears',
+    category: 'Rapid Descent',
+    tagline: 'For when standard ears aren\'t enough. Two outer A-lines per side fold more surface — speed bar becomes MANDATORY.',
+    rule: 'Class A/B/C: speed bar at minimum 50%. NEVER pull the inner (central) A-risers — that triggers a full frontal collapse.',
+    phases: [
+      P('Normal Flight', 1200,
+        { descentRate:1.2 },
+        'Standard flight before initiating. Pilot identifies the outermost TWO A-lines on each side, gripped as high up as possible.'),
+      P('Pull Left Doubles', 800,
+        { leftEar:1.5, descentRate:3.5, pitch:-5 },
+        'Both outer-left A-lines pulled deep and high together. A much larger section of the wing folds in. Drag spikes.'),
+      P('Pull Right Doubles', 800,
+        { rightEar:1.5, descentRate:5.5, pitch:-8 },
+        'Same on the right (sequentially). Wing is now significantly smaller. Angle of attack rises sharply — the wing is on the edge of a stall without speed bar.'),
+      P('MANDATORY Speed Bar', 1000,
+        { speedBar:0.6, descentRate:8.0, pitch:0 },
+        'Speed bar pushed to AT LEAST 50% of travel. Without this the wing hangs back and approaches stall. With it, 6–8 m/s descent rates are achieved. Never touch the INNER A-risers — that causes a frontal.'),
+      P('Holding · Flapping', 2500,
+        { speedBar:0.6, descentRate:8.0 },
+        'The folded tips often FLAP loudly — this is just normal pressure indication, not imminent collapse. The risers must be held firmly. If pitch becomes nervous, ADD a touch more speed bar to settle it.'),
+      P('Release Speed Bar', 800,
+        { speedBar:0, descentRate:6.0, pitch:-3 },
+        'Speed bar released first, smoothly.'),
+      P('Release & Pump', 1500,
+        { leftEar:0, rightEar:0, descentRate:1.2, pitch:0, forwardSpeed:10 },
+        'Risers released. Really big ears may stick due to the high pressure — decisive deep pumps of each brake (one at a time) reopen them.')
+    ]
+  },
+
+  b_stall: {
+    name: 'B-Stall',
+    category: 'Rapid Descent',
+    tagline: 'Pulling the B-risers symmetrically breaks the wing\'s airfoil along its span. Lift vanishes; descent becomes purely vertical.',
+    rule: 'Recovery must be complete by 80–100 m AGL. Release SHARPLY, fast, symmetrically — slow release risks parachutal/deep stall.',
+    phases: [
+      P('Normal Flight', 1500,
+        { descentRate:1.2, forwardSpeed:10 },
+        'Cruise flight. Pilot grabs the B-risers high, near the karabiners. Brakes stay in the hands. Unlike Big Ears there is NO horizontal motion possible.'),
+      P('Pull B-Risers', 1000,
+        { bStall:1, pitch:-15, descentRate:7.0, forwardSpeed:1 },
+        'B-risers pulled symmetrically and strongly downward. Resistance is high at first then gives way as the airfoil breaks. The wing falls slightly behind and stabilises; lift vanishes.'),
+      P('Vertical Descent', 2500,
+        { bStall:1, pitch:-15, descentRate:7.0, forwardSpeed:0 },
+        'Pure vertical drop, ~7–8 m/s. No forward motion — pilot hangs directly below the deformed wing. Pleasant and controllable, but useless near terrain. Never asymmetric — pulling one side risks a spin.'),
+      P('Release Risers', 200,
+        { bStall:0.3, pitch:-5, descentRate:5.0, forwardSpeed:3 },
+        'Risers released SHARPLY, fast and symmetrically. A slow release leaves the wing parachutal above your head — DO NOT pull brakes; instead push the A-risers forward or tap speed bar to restart airflow.'),
+      P('Wing Surges Forward', 1000,
+        { bStall:0, pitch:25, descentRate:2.5, forwardSpeed:15 },
+        'Wing dives forward to regain flying speed. Pilot is briefly behind. Hands stay UP — pulling brakes here re-enters stall.'),
+      P('Recovery to Flight', 1500,
+        { pitch:0, descentRate:1.2, forwardSpeed:10 },
+        'Wing settles overhead, airflow restored, normal flight resumes.')
+    ]
+  },
+
+  frontal_collapse: {
+    name: 'Frontal Collapse',
+    category: 'Collapses',
+    tagline: 'The leading edge folds symmetrically under the wing. Drag spikes — pilot swings forward, wing reinflates with a powerful surge.',
+    rule: 'Hands UP — speed is your friend. Pump only if it doesn\'t reopen automatically. Symmetric collapse → stay neutral in the harness (no weight shift).',
+    phases: [
+      P('Trim Flight', 1500,
+        { descentRate:1.2, forwardSpeed:10 },
+        'Cruise. In SIV the frontal is induced by sharply pulling the central A-risers. In real flight it comes from turbulence, exiting lift abruptly, or letting brakes up suddenly.'),
+      P('Leading Edge Folds', 250,
+        { frontal:1, pitch:0, descentRate:2.5, forwardSpeed:3 },
+        'The whole leading edge tucks under in a fraction of a second. Drag spikes. The wing decelerates violently — pilot keeps moving forward (pendulum effect).'),
+      P('Pilot Swings Forward', 600,
+        { frontal:1, pitch:-10, descentRate:3.0, forwardSpeed:1 },
+        'Pilot pendulums ahead of the wing. Hands stay UP — the wing needs speed to reinflate. Pulling brakes here induces an immediate Full Stall. On A/B class wings, recovery is usually automatic.'),
+      P('Pump (If Needed)', 400,
+        { frontal:0.6, brakeL:0.55, brakeR:0.55, pitch:-5 },
+        'If the wing doesn\'t reopen within ~1 second, ONE deep, fast, symmetric pump of both brakes (50–70% of travel) forces air to repressurise the leading edge. Return hands UP immediately.'),
+      P('Reinflation Surge', 800,
+        { frontal:0, brakeL:0, brakeR:0, pitch:35, descentRate:2.5, forwardSpeed:15 },
+        'Wing reopens and SURGES powerfully forward to regain airspeed. Pilot is now behind. Surge can be dramatic on high-aspect wings — the more brake you used to reopen, the more violent the surge will be.'),
+      P('Symmetric Catch', 500,
+        { pitch:25, brakeL:0.4, brakeR:0.4, descentRate:1.8 },
+        'Pilot brakes the surge symmetrically to stop the wing exactly overhead. Too much brake here causes a secondary stall.'),
+      P('Recovered Flight', 1200,
+        { pitch:0, brakeL:0, brakeR:0, descentRate:1.2, forwardSpeed:10 },
+        'Wing stabilises overhead. Normal flight restored.')
+    ]
+  },
+
+  shark_nose_frontal: {
+    name: 'Shark Nose Frontal',
+    category: 'Collapses',
+    tagline: 'Modern Shark Nose wings can stay folded after a frontal — the convex cell openings can "seal" against airflow. Recovery requires active pumping.',
+    rule: 'On Shark Nose: don\'t wait passively. After 1 second still folded → ONE strong, brief 70–80% pump, hands straight back up. Expect a bigger surge than a standard wing.',
+    phases: [
+      P('Trim Flight', 1200,
+        { descentRate:1.2, forwardSpeed:10 },
+        'Cruise on a modern Shark Nose wing. The same geometry that gives high passive safety also delays automatic reinflation after a frontal.'),
+      P('Frontal Triggered', 250,
+        { frontal:1, pitch:0, descentRate:2.5, forwardSpeed:2 },
+        'Strong turbulence (or pulling the central A-risers in SIV) folds the leading edge under.'),
+      P('Hands Up · Waiting', 1200,
+        { frontal:0.95, pitch:-10, descentRate:3.5, forwardSpeed:0 },
+        'Hands stay UP. Standard recovery procedure. But — on Shark Nose, the cell mouths can seal and the wing remains folded for noticeably longer than a classic wing. The pilot is losing altitude while folded.'),
+      P('ACTIVE Pump · 70–80%', 400,
+        { frontal:0.5, brakeL:0.75, brakeR:0.75, pitch:-5 },
+        'Don\'t wait passively. Apply a strong, symmetric, deep brake stroke (70–80% of travel) for a fraction of a second only. This momentarily spikes internal pressure and forces the Shark Nose cells to unseal and re-expose to airflow.'),
+      P('Hands Straight Up', 300,
+        { frontal:0.2, brakeL:0, brakeR:0, pitch:5 },
+        'Return hands fully up. The wing has been "kicked" back into the airflow.'),
+      P('Dynamic Surge', 800,
+        { frontal:0, pitch:40, descentRate:2.5, forwardSpeed:16 },
+        'Because Shark Nose wings accumulate more energy during the fold, the reinflation surge is more dynamic. Be ready to control it decisively.'),
+      P('Decisive Catch', 600,
+        { pitch:25, brakeL:0.45, brakeR:0.45, descentRate:1.8 },
+        'Stronger, symmetric check than usual to stop the wing over the head.'),
+      P('Recovered Flight', 1200,
+        { pitch:0, brakeL:0, brakeR:0, descentRate:1.2, forwardSpeed:10 },
+        'Active assistance is essential on these wings. Passive waiting alone can cost significant altitude.')
+    ]
+  },
+
+  asymmetric_collapse: {
+    name: 'Asymmetric Collapse',
+    category: 'Collapses',
+    tagline: 'The most common in-flight event in paragliding. One side loses pressure and folds; the wing yaws and rolls violently toward the closed side.',
+    rule: '3-step method — Weight on OPEN side → Counter-brake just enough for straight heading → Pump the CLOSED side. Fly first, fix second.',
+    phases: [
+      P('Trim Flight', 1200,
+        { descentRate:1.2, forwardSpeed:10 },
+        'Normal cruise flight before the event.'),
+      P('Left Side Collapses', 250,
+        { leftCol:1, roll:-20, descentRate:2.5 },
+        '50% of the LEFT side loses pressure and folds. Drag becomes massively asymmetric — the wing immediately yaws and rolls toward the closed side.'),
+      P('Rotation Begins', 800,
+        { leftCol:1, roll:-30, yawRate:-90, descentRate:3.5, forwardSpeed:7 },
+        'Wing accelerates into a turn toward the closed side. If left unmanaged this becomes a spiral within seconds. The open side is now carrying all the load.'),
+      P('STEP 1 · Weight on Open Side', 600,
+        { leftCol:1, roll:-20, lean:1, yawRate:-50, descentRate:3.0 },
+        'STEP 1 — Weight shift HARD to the OPEN side (right). This unloads the closed side and helps the open side keep flying straight.'),
+      P('STEP 2 · Counter-Brake', 800,
+        { leftCol:1, roll:-10, lean:1, brakeR:0.55, yawRate:-15, descentRate:2.8 },
+        'STEP 2 — Progressive brake on the OPEN side. Only as much as needed to stop the rotation. Too much = SPIN or Full Stall on the loaded flying side.'),
+      P('STEP 3 · Pump Closed Side', 1000,
+        { leftCol:0.4, brakeR:0.3, brakeL:0.6, lean:0.5, yawRate:0, descentRate:2.5 },
+        'STEP 3 — Once heading is controlled, deep decisive pumps on the closed side (left) to push air into the trapped section. Avoid small nervous pumps.'),
+      P('Reopening Surge', 700,
+        { leftCol:0, roll:0, lean:0, brakeL:0, brakeR:0, pitch:15, descentRate:1.8 },
+        'Wing reopens. A small forward pitch may follow — hands up, control any surge symmetrically. A 50% collapse CAN fly straight with correct weight + counter-brake.'),
+      P('Recovered', 1200,
+        { pitch:0, descentRate:1.2 },
+        'Hierarchy: heading first, then reinflation, then airspeed. If a portion remains tangled in the lines after reopening → see Cravatte.')
+    ]
+  },
+
+  cravatte: {
+    name: 'Cravatte',
+    category: 'Collapses',
+    tagline: 'A wingtip trapped in the lines — the most common cause of reserve deployment, in both SIV and free flight.',
+    rule: 'Heading → Altitude → Solution. Less than 2 sec to stop the rotation. Below 200 m AGL → reserve, no more attempts.',
+    phases: [
+      P('Bad Surge Exit', 800,
+        { pitch:35, descentRate:2.5, forwardSpeed:14 },
+        'Cravattes usually develop after a violent asymmetric surge — bad Stall or Spin exits. The wing dives, and a tip flicks through the suspension lines.'),
+      P('Tip Caught', 400,
+        { cravatte:1, pitch:10, roll:18, descentRate:3.0 },
+        'A wingtip is now TANGLED in the lines, forming a knot. Massive asymmetric drag. Wing begins to turn toward the cravatte side.'),
+      P('Spiral Threat · 2-sec Rule', 800,
+        { cravatte:1, roll:30, yawRate:80, descentRate:5.0 },
+        'Wing tries to lock into a spiral. You have LESS THAN 2 SECONDS to stop the rotation with weight + counter-brake. If you can\'t — go to reserve before centrifugal force pins your arms or twists the risers.'),
+      P('Counter Weight + Deep Brake', 800,
+        { cravatte:1, roll:10, lean:-1, brakeL:0.7, yawRate:10 },
+        'ALL weight to the opposite side. Counter-brake as deep as required — even very deep — to fly straight. Priority: FLY first, fix second.'),
+      P('Attempt 1 · Pump Cravatte Side', 1000,
+        { cravatte:0.7, lean:-0.7, brakeL:0.5, brakeR:0.4, descentRate:2.0 },
+        'First disengagement attempt: deep, fast pump on the brake of the cravatte side. The deliberate-asymmetric-collapse technique that used to be taught is NO LONGER recommended on modern wings — it can accelerate the rotation into autorotation.'),
+      P('Attempt 2 · Pull the Stabilo', 1500,
+        { cravatte:0.4, roll:5, lean:-0.5, brakeL:0.4 },
+        'Locate the STABILO line — typically a different colour, at the outer edge of the riser. Pull it directly. It pulls the wingtip itself and often releases the tip.'),
+      P('Attempt 3 · Big Ears', 800,
+        { cravatte:0.1, leftEar:0.8, rightEar:0.8, descentRate:2.5 },
+        'If stabilo fails: big ears change the line tension and can free the trapped fabric. Last resort: a clean Full Stall empties all lines and lets the tip slide out — but a bad exit can create a new cravatte on the other side.'),
+      P('Released', 800,
+        { cravatte:0, leftEar:0, rightEar:0, roll:0, lean:0, brakeL:0, pitch:5, descentRate:1.5 },
+        'Cravatte clears. If at any point heading becomes uncontrollable, or altitude runs out (below 200 m): RESERVE — without delay.'),
+      P('Recovered', 1000,
+        { pitch:0, descentRate:1.2 },
+        'GOLDEN RULE — Heading → Altitude → Solution. The reserve is not failure; it\'s a tool.')
+    ]
+  },
+
+  wing_overs: {
+    name: 'Wing Overs',
+    category: 'Dynamic',
+    tagline: 'Coordinated swinging turns that build roll and pitch energy. The foundation for thermal centring and active safety in turbulence.',
+    rule: 'Weight ALWAYS before brake. Brake on the descent (max speed), not the climb. Don\'t exceed 90° of bank without training. Look at the inside horizon — not the wing.',
+    phases: [
+      P('Trim Flight', 1200,
+        { descentRate:1.2, forwardSpeed:10 },
+        'Begin from trim speed. Pilot will alternate weight-shift then brake on each side, rhythmically.'),
+      P('Weight Right · Brake Right', 1200,
+        { roll:25, lean:1, brakeR:0.45, descentRate:1.5, forwardSpeed:9 },
+        'Weight shift FIRST, then progressive right brake. Wing tilts right and climbs into a bank.'),
+      P('Weight Shifts Left', 600,
+        { roll:25, lean:-1, brakeR:0.45, descentRate:1.8 },
+        'As the wing reaches the TOP of its arc and begins to fall, weight shifts to the LEFT before any brake input.'),
+      P('Left Brake at Bottom', 1000,
+        { roll:-40, lean:-1, brakeR:0, brakeL:0.55, descentRate:2.2, forwardSpeed:13 },
+        'Left brake applied when the wing is at the BOTTOM (maximum airspeed). This converts speed into climb on the new side — bank deepens with each cycle.'),
+      P('Weight Right Again', 600,
+        { roll:-40, lean:1, brakeL:0.55, descentRate:2.5 },
+        'At the top of the left side, weight shifts right BEFORE braking. Always: weight before brake.'),
+      P('Higher Bank Right', 1000,
+        { roll:55, lean:1, brakeL:0, brakeR:0.65, descentRate:2.8, forwardSpeed:14 },
+        'Energy builds — bank deepens. Keep slight OUTER brake at the top of each arc; the upper wingtip tends to lose pressure and collapse if left fully released.'),
+      P('Dissipating 360°', 1800,
+        { roll:35, lean:0.3, brakeR:0.3, yawRate:120, descentRate:2.0 },
+        'EXIT through a wide 360° — never stop abruptly on a straight heading (the energy converts to a violent climb-then-dive). Brake and weight release gradually through the turn.'),
+      P('Level Flight', 1500,
+        { roll:0, lean:0, brakeR:0, yawRate:0, pitch:5, descentRate:1.3, forwardSpeed:10 },
+        'Final small symmetric brake catches any residual pitch. Wing returns to neutral overhead.')
+    ]
+  },
+
+  spiral_dive: {
+    name: 'Spiral Dive',
+    category: 'Dynamic',
+    tagline: 'The most effective rapid descent — sustained banked 360°s achieving up to 20 m/s. Significant G-load; airspace below MUST be clear.',
+    rule: 'Outer brake REGULATES the spiral — it lifts the nose toward the horizon and stabilises descent. Move weight from inside toward harness CENTER to avoid lock-in.',
+    phases: [
+      P('Trim Flight', 1000,
+        { descentRate:1.2 },
+        'Check air below is completely clear — descent rates here are extreme.'),
+      P('Initial Bank · 180°', 1200,
+        { roll:30, lean:1, brakeR:0.35, yawRate:90, descentRate:2.5 },
+        'A normal turn is initiated — weight shift then progressive inner brake. Wing banks; turn tightens.'),
+      P('Tightening · Diving', 1200,
+        { roll:55, lean:1, brakeR:0.6, yawRate:200, descentRate:8.0, gLoad:2.0 },
+        'Inner brake deepens. After 2–3 revolutions the wing\'s nose points down — the pilot is pulled OUTWARD by centrifugal force. G-load rises.'),
+      P('Stable Spiral · 14 m/s', 2500,
+        { roll:65, lean:0.5, brakeR:0.6, brakeL:0.15, yawRate:280, descentRate:14.0, gLoad:3.0 },
+        'Stable spiral. Outer brake held lightly to keep the outer wing pressurised and prevent collapse from high airspeed. Weight shifts gradually from inside toward harness center to prevent the spiral from locking in.'),
+      P('Begin Exit · 0°→90°', 800,
+        { roll:55, brakeR:0.4, brakeL:0.15, yawRate:250, descentRate:11.0, gLoad:2.5 },
+        'Exit is PROGRESSIVE — release inner brake over a full 360°. First quarter: brake slightly released, outer brake helps lift the nose toward the horizon.'),
+      P('Mid Exit · 90°→180°', 800,
+        { roll:40, brakeR:0.2, yawRate:180, descentRate:7.0, gLoad:1.8 },
+        'Wing rises toward the horizon, speed begins to drop, bank reduces.'),
+      P('Late Exit · 180°→270°', 800,
+        { roll:20, brakeR:0.1, yawRate:100, descentRate:4.0, gLoad:1.3 },
+        'Wing nearly horizontal but still carrying significant speed.'),
+      P('Pitch Catch · 270°→360°', 600,
+        { roll:0, brakeR:0, brakeL:0.4, pitch:15, yawRate:0, descentRate:2.0 },
+        'As the bank levels, the wing climbs. At the top, a decisive symmetric brake catches the inevitable forward dive. An abrupt brake release at any earlier point causes a massive surge and possible collapse.'),
+      P('Level Flight', 1000,
+        { pitch:0, brakeL:0, descentRate:1.2, gLoad:1.0 },
+        'Energy smoothly converted back to altitude.')
+    ]
+  },
+
+  over_the_nose: {
+    name: 'Over-the-Nose Spiral',
+    category: 'Dynamic',
+    tagline: 'Extreme spiral where the leading edge points vertically at the ground. Neutral or negative stability — the exit must be FORCED, not waited for.',
+    rule: 'Inner brake alone WILL NOT exit the lock. Counter weight + progressive OUTER brake. Tense abs and legs to prevent G-induced blackout.',
+    phases: [
+      P('Spiral Established', 1000,
+        { roll:65, brakeR:0.6, yawRate:280, descentRate:14.0, gLoad:3.0 },
+        'Stable spiral. Pilot deepens inner brake further, transitioning toward over-the-nose.'),
+      P('Pitching Forward', 1200,
+        { roll:75, brakeR:0.8, pitch:25, yawRate:340, descentRate:17.0, gLoad:3.5 },
+        'Nose pitches forward. Pilot\'s body aligns horizontally. Pressure on the seat increases vertically.'),
+      P('LOCKED · Vertical Dive', 2500,
+        { roll:85, brakeR:0.8, pitch:35, yawRate:360, descentRate:19.0, gLoad:4.0 },
+        'Wing is LOCKED — leading edge straight down. Neutral stability: simply releasing the inner brake will NOT start the exit. Centrifugal force may pin the arms. Descent rates above 18 m/s.'),
+      P('FORCE Exit · Outer Brake', 1000,
+        { roll:75, brakeR:0.5, brakeL:0.6, lean:-1, pitch:25, yawRate:320, descentRate:16.0, gLoad:3.5 },
+        'Counter weight-shift to the OUTER side + progressive OUTER brake. This is the only way to break the lock — use both hands on the outer brake if needed.'),
+      P('Lifting Toward Horizon', 1200,
+        { roll:55, brakeL:0.4, pitch:10, yawRate:250, descentRate:10.0, gLoad:2.5 },
+        'Wing\'s nose lifts. Spiral shallows. Once the spiral becomes a shallow banked turn, the dissipation phase begins.'),
+      P('Spiral Dissipation', 1500,
+        { roll:25, brakeL:0.2, yawRate:120, descentRate:4.5, gLoad:1.5 },
+        'From the locked vertical, full recovery requires 1.5 to 2 full revolutions due to the accumulated energy.'),
+      P('Catch & Level', 800,
+        { roll:0, brakeL:0.4, pitch:10, yawRate:0, descentRate:1.8, gLoad:1.0 },
+        'Symmetric brake catches the pitch surge. Maintain abdominal and leg tension throughout to keep blood flow to the brain.'),
+      P('Recovered', 1000,
+        { pitch:0, brakeL:0, descentRate:1.2 },
+        'Level flight restored.')
+    ]
+  },
+
+  full_stall: {
+    name: 'Full Stall',
+    category: 'Stalls',
+    tagline: 'The most important SIV exercise. Wing completely stops flying, falls behind, then enters the controlled backfly phase before recovery.',
+    rule: 'When in doubt, KEEP the stall. Hands LOCKED at the hips throughout the fall-back. NEVER release while the wing is behind — falling into the canopy is the risk.',
+    phases: [
+      P('Trim Flight', 1500,
+        { descentRate:1.2, forwardSpeed:10 },
+        'Pilot wraps brakes one turn around the hands for full control on long-travel wings. Progressive, full brake application is about to begin.'),
+      P('Progressive Stall', 1200,
+        { brakeL:1, brakeR:1, pitch:-20, descentRate:3.5, forwardSpeed:2 },
+        'Brakes pulled progressively to FULL. The airfoil drains; the wing stops flying and falls violently BACK behind the pilot.'),
+      P('Fall-Back · Pendulum', 600,
+        { brakeL:1, brakeR:1, pitch:-50, descentRate:5.0, forwardSpeed:-3 },
+        'Wing is BEHIND, pilot swings forward. Massive pull on the brakes — pilot must RESIST and keep brakes LOCKED at the hips, under the seat. Releasing here would let the wing surge into a possible canopy strike.'),
+      P('Horseshoe Forms', 800,
+        { brakeL:1, brakeR:1, horseshoe:1, pitch:-30, descentRate:5.5, forwardSpeed:0 },
+        'Wing wraps into a HORSESHOE shape — wingtips point forward, no airflow. Pilot is now beneath, descending vertically at ~5 m/s.'),
+      P('Backfly · Stable', 1800,
+        { brakeL:1, brakeR:1, horseshoe:1, pitch:-5, descentRate:5.0 },
+        'BACKFLY — the stable stalled state. Hands carefully raised to karabiner height; the wing "sits" overhead, wobbling but balanced. This is the safety zone before exit.'),
+      P('Smooth Release', 400,
+        { brakeL:0.3, brakeR:0.3, horseshoe:0.5, pitch:0, descentRate:3.5 },
+        'Brakes released symmetrically from karabiner height upward. Smooth but decisive. Any asymmetry here triggers a spin or cravatte.'),
+      P('Reinflation Surge', 800,
+        { brakeL:0, brakeR:0, horseshoe:0, pitch:40, descentRate:2.0, forwardSpeed:14 },
+        'Wing reinflates and surges forward to regain flying speed. Pilot is briefly behind.'),
+      P('Symmetric Catch', 500,
+        { pitch:25, brakeL:0.4, brakeR:0.4, descentRate:1.5 },
+        'Brakes catch the surge — often down to shoulder height — to stop the wing exactly overhead. Don\'t over-brake (secondary stall risk).'),
+      P('Recovered Flight', 1200,
+        { pitch:0, brakeL:0, brakeR:0, descentRate:1.2 },
+        'Wing settles. Hands up; check airspeed and horizon.')
+    ]
+  },
+
+  dynamic_spin: {
+    name: 'Dynamic Spin',
+    category: 'Stalls',
+    tagline: 'A spin entered from trim speed or during a turn — sudden, deep brake on one side. Pilot is thrown outward by centrifugal force; height loss is rapid.',
+    rule: 'Release BOTH brakes within the first 45° of rotation. If the spin continues past 2–3 turns → Full Stall it, or deploy reserve. Time is the enemy.',
+    phases: [
+      P('Banked Turn', 1200,
+        { roll:25, lean:1, brakeR:0.4, descentRate:1.8, forwardSpeed:8 },
+        'Normal banked turn from trim speed. Setup for a Dynamic Spin entry.'),
+      P('Sudden Deep Brake', 200,
+        { roll:20, brakeR:1, descentRate:2.5 },
+        'Pilot abruptly pulls the inner brake deep and fast — past the stall point of that side.'),
+      P('Spin Onset', 500,
+        { brakeR:1, roll:15, yawRate:-160, descentRate:4.0 },
+        'Inner half stalls; outer half still flying. The wing pivots violently around the pilot. Centrifugal force throws the pilot outward — characteristic of a Dynamic Spin.'),
+      P('Rotation · 360°', 1200,
+        { brakeR:1, roll:20, yawRate:-260, descentRate:5.5, gLoad:1.5 },
+        'Fast yaw rotation. Significant altitude loss per revolution.'),
+      P('RELEASE Both · <45°', 200,
+        { brakeR:0, brakeL:0, yawRate:-120, descentRate:4.5 },
+        'Decision window — release BOTH brakes in the first 45° of rotation. Hands UP. The wing needs airspeed to start flying again.'),
+      P('Stopping Rotation', 600,
+        { yawRate:-20, pitch:-10, descentRate:3.0 },
+        'Rotation slows; wing pitches forward to recover airflow.'),
+      P('Reinflation Surge', 800,
+        { pitch:30, yawRate:0, descentRate:2.0, forwardSpeed:13 },
+        'Wing surges forward asymmetrically. If timing was slow or release was asymmetric, this is where a cravatte often forms.'),
+      P('Symmetric Catch', 600,
+        { pitch:15, brakeL:0.3, brakeR:0.3, descentRate:1.5 },
+        'Symmetric brake catches the surge.'),
+      P('Recovered Flight', 1200,
+        { pitch:0, brakeL:0, brakeR:0, descentRate:1.2 },
+        'Normal flight. If the spin had continued past 2–3 rotations: Full Stall to neutralise, or reserve.')
+    ]
+  },
+
+  flat_spin: {
+    name: 'Flat Spin',
+    category: 'Stalls',
+    tagline: 'An asymmetric stall from slow flight. No centrifugal force pulls the pilot outward — riser twist becomes very likely, and brakes become unusable.',
+    rule: 'No centrifugal force = riser twist risk is HIGH. If brakes lock from twist → use C or B risers (see Riser Twist Recovery). Past 2–3 rotations: reserve.',
+    phases: [
+      P('Slow Flight', 1200,
+        { brakeL:0.6, brakeR:0.6, descentRate:1.6, forwardSpeed:4 },
+        'Wing is already flying slowly — typical Flat Spin setup. Both brakes deep, near the stall point.'),
+      P('Asymmetric Brake', 300,
+        { brakeL:1, brakeR:0.6, descentRate:2.0, forwardSpeed:2 },
+        'Pilot deepens ONE brake further past the stall point. The left side stops flying.'),
+      P('Flat Spin Onset', 600,
+        { brakeL:1, brakeR:0.6, roll:-10, yawRate:-180, descentRate:3.5, forwardSpeed:0 },
+        'Left half STALLED, right half still flying slowly. The wing rotates flat around the pilot, who stays nearly vertical below.'),
+      P('Flat Spin · Twist Risk', 1500,
+        { brakeL:1, brakeR:0.6, roll:-15, yawRate:-250, descentRate:5.0, gLoad:1.2 },
+        'Sustained flat rotation. No centrifugal force pulls the pilot out, so the risers TWIST rapidly — the brake handles can be pulled up out of reach. Clock is ticking.'),
+      P('RELEASE Both Brakes', 200,
+        { brakeL:0, brakeR:0, yawRate:-100, descentRate:4.0 },
+        'Release BOTH brakes immediately — within the first 45° of rotation. Hands UP.'),
+      P('Stopping Rotation', 600,
+        { yawRate:-20, pitch:-10, descentRate:3.0 },
+        'Wing slows rotation and begins to pitch forward to recover airflow.'),
+      P('Reinflation Surge', 800,
+        { pitch:30, yawRate:0, descentRate:2.0, forwardSpeed:13 },
+        'Wing surges forward. If risers twisted during the spin, the brakes will still be unusable here — see Riser Twist Recovery.'),
+      P('Symmetric Catch', 600,
+        { pitch:15, brakeL:0.3, brakeR:0.3, descentRate:1.5 },
+        'Symmetric brake catches the surge.'),
+      P('Recovered Flight', 1200,
+        { pitch:0, brakeL:0, brakeR:0, descentRate:1.2 },
+        'If rotation persisted past 2–3 turns: stall fully, or deploy reserve.')
+    ]
+  },
+
+  riser_twist: {
+    name: 'Riser Twist Recovery',
+    category: 'Stalls',
+    tagline: 'When risers wrap and the brake lines lock — typically after a flat spin. The brakes are unusable; control transfers to the C (or B) risers above the twist.',
+    rule: 'Don\'t fight the locked brakes. Grab C-risers ABOVE the twist; pull down to stall the wing; kick legs to counter-rotate; return to brakes when unwound.',
+    phases: [
+      P('Twist Forming', 600,
+        { riserTwist:1, brakeL:0.4, brakeR:0.7, yawRate:-220, descentRate:5.0 },
+        'After a flat spin, the suspension risers have wrapped. The brake handles are pulled high and tight; pulling them does nothing.'),
+      P('Brakes Locked', 1000,
+        { riserTwist:1, brakeL:0.3, brakeR:0.3, yawRate:-150, descentRate:4.0 },
+        'Pilot tries the brakes — they are jammed. DO NOT keep pulling them; that does nothing and wastes altitude. The control path must move above the twist.'),
+      P('Grab C-Risers', 800,
+        { riserTwist:1, cBrake:0.3, yawRate:-100, descentRate:4.0 },
+        'Reach up. Grab the C-risers (or B-risers) ABOVE the point where the lines have twisted. These bypass the locked brake mechanism.'),
+      P('Stall via C-Risers', 1500,
+        { riserTwist:1, cBrake:1, pitch:-15, yawRate:-30, descentRate:5.5, horseshoe:0.6 },
+        'Pull the C-risers strongly downward. This stalls the wing — the asymmetric rotation stops because the wing has no airflow to feed the spin.'),
+      P('Kick to Unwind', 2000,
+        { riserTwist:0.5, cBrake:0.9, yawRate:0, descentRate:5.0, horseshoe:0.7 },
+        'Wing held stalled via the risers. Pilot kicks the legs to create counter-rotational momentum in the harness — gradually unwinding the twist.'),
+      P('Twist Cleared', 600,
+        { riserTwist:0, cBrake:0.6, descentRate:4.0, horseshoe:0.5 },
+        'Risers untwisted. Pilot is now correctly oriented under the wing again; brakes are accessible.'),
+      P('Return to Brakes', 600,
+        { cBrake:0, brakeL:0.9, brakeR:0.9, pitch:-5, descentRate:4.0, horseshoe:0.3 },
+        'Hands transition back to the brake handles. Maintain the stall briefly until ready to exit cleanly.'),
+      P('Controlled Stall Exit', 800,
+        { brakeL:0, brakeR:0, horseshoe:0, pitch:35, descentRate:2.0, forwardSpeed:14 },
+        'Symmetric release. Wing surges forward to regain flying speed — exactly like a Full Stall exit.'),
+      P('Catch & Level', 600,
+        { pitch:20, brakeL:0.4, brakeR:0.4, descentRate:1.5 },
+        'Decisive symmetric catch.'),
+      P('Recovered', 1200,
+        { pitch:0, brakeL:0, brakeR:0, descentRate:1.2 },
+        'Flight restored. The risers are your only control tool when the brakes are unreachable.')
+    ]
+  },
+
+  parachutal_stall: {
+    name: 'Parachutal Stall',
+    category: 'Stalls',
+    tagline: 'The wing stays open but stops flying forward. Airflow detaches; the wing descends vertically like a parachute, not a glider.',
+    rule: 'Recognition signs: airflow goes SILENT, "elevator dropping" feeling, brakes go LIGHT/dead, canopy looks wrinkled. Solution: hands up; if persistent, push A-risers forward or tap speed bar — NEVER pull brakes, NEVER try to turn.',
+    phases: [
+      P('Slow Flight', 1500,
+        { brakeL:0.7, brakeR:0.7, descentRate:1.5, forwardSpeed:3 },
+        'Often induced by over-braking (e.g. trying to minimise sink in weak lift), a slow B-stall recovery, strong wind gradient, or out-of-trim equipment.'),
+      P('Recognition · Going Silent', 400,
+        { brakeL:0.85, brakeR:0.85, paraStall:0.7, descentRate:3.5, forwardSpeed:0 },
+        'Angle of attack exceeds critical. Airflow detaches. The "sound" of air falls silent — that\'s the first cue. Then the "elevator drop" feeling in the stomach; the brakes go dead-light; the canopy looks wrinkled and soft.'),
+      P('Parachutal · Vertical Drop', 2500,
+        { brakeL:0.85, brakeR:0.85, paraStall:1, pitch:0, descentRate:5.0, forwardSpeed:0 },
+        'Wing remains OPEN above the pilot but descends purely vertically (~5 m/s). Canopy pressure low; no forward speed. The horizon appears to rise.'),
+      P('STEP 1 · Hands Up', 600,
+        { brakeL:0, brakeR:0, paraStall:0.6, pitch:5, descentRate:4.0, forwardSpeed:2 },
+        'Release brakes completely — hands UP. On most modern wings this alone restarts flight. DO NOT try to turn — pulling one brake instantly creates a spin on that side.'),
+      P('STEP 2 · A-Risers / Speed Bar', 800,
+        { speedBar:0.3, paraStall:0.2, pitch:15, descentRate:2.5, forwardSpeed:8 },
+        'If still parachutal: push the A-risers GENTLY forward symmetrically, OR engage speed bar slightly. This forces the wing to "bite" the air and accelerate.'),
+      P('Reinflation Pitch', 800,
+        { speedBar:0, paraStall:0, pitch:20, descentRate:1.8, forwardSpeed:12 },
+        'Wing regains airspeed and pitches forward. Let it dive to recover speed — brake only if the dive is excessive, but don\'t hold the brake or it stays stalled.'),
+      P('Recovered Flight', 1200,
+        { pitch:0, descentRate:1.2, forwardSpeed:10 },
+        'BELOW 30 m AGL: do not try to recover — the recovery dive can drive you into the ground. Hold the canopy stable, PLF position, accept the 5 m/s stall descent. Know your wing\'s certification deep-stall behaviour as prevention.')
+    ]
+  }
+};
+
+const CATEGORIES = [
+  { name: 'Active Piloting', maneuvers: ['pitch_control'] },
+  { name: 'Rapid Descent', maneuvers: ['big_ears', 'really_big_ears', 'b_stall'] },
+  { name: 'Collapses', maneuvers: ['frontal_collapse', 'shark_nose_frontal', 'asymmetric_collapse', 'cravatte'] },
+  { name: 'Dynamic', maneuvers: ['wing_overs', 'spiral_dive', 'over_the_nose'] },
+  { name: 'Stalls', maneuvers: ['full_stall', 'dynamic_spin', 'flat_spin', 'riser_twist', 'parachutal_stall'] }
+];
+
+// --- APP STATE ---
+let currentManeuverId = 'pitch_control';
+let currentPhaseIndex = 0;
+let phaseElapsed = 0;
+let playing = false;
+let speed = 1;
+let lastFrameTime = 0;
+let renderState = deepClone(STATE_DEFAULT);
+let groundOffset = 0;
+let yawOffset = 0;
+
+// --- UTILITIES ---
+function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function easeInOut(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+function applyTargets(baseState, targets) {
+  const s = deepClone(baseState);
+  for (const key in targets) {
+    if (key in s.wing) s.wing[key] = targets[key];
+    else if (key in s.pilot) s.pilot[key] = targets[key];
+    else if (key in s.world) s.world[key] = targets[key];
+  }
+  return s;
+}
+
+function buildAbsoluteStates(maneuver) {
+  const states = [];
+  let cur = deepClone(STATE_DEFAULT);
+  states.push(deepClone(cur));
+  for (const phase of maneuver.phases) {
+    cur = applyTargets(cur, phase.targets);
+    states.push(deepClone(cur));
+  }
+  return states;
+}
+
+function interpolateState(a, b, t) {
+  const result = deepClone(a);
+  const ease = easeInOut(t);
+  for (const cat of ['wing','pilot','world']) {
+    for (const key in a[cat]) {
+      result[cat][key] = lerp(a[cat][key], b[cat][key], ease);
+    }
+  }
+  return result;
+}
+
+// --- SIDE VIEW ---
+function buildSideViewSVG() {
+  const svg = document.getElementById('side-svg');
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="sky-gradient" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#1a2840"/>
+        <stop offset="50%" stop-color="#2e4870"/>
+        <stop offset="100%" stop-color="#486d9c"/>
+      </linearGradient>
+      <linearGradient id="ground-gradient" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#3a2f25"/>
+        <stop offset="100%" stop-color="#1a1208"/>
+      </linearGradient>
+      <radialGradient id="sun-glow" cx="0.85" cy="0.15" r="0.4">
+        <stop offset="0%" stop-color="rgba(232,176,78,0.25)"/>
+        <stop offset="100%" stop-color="rgba(232,176,78,0)"/>
+      </radialGradient>
+    </defs>
+    <rect class="sky-bg" x="0" y="0" width="500" height="320"/>
+    <rect width="500" height="320" fill="url(#sun-glow)"/>
+    <rect class="ground-bg" x="0" y="320" width="500" height="80"/>
+    <line class="horizon-line" x1="0" y1="320" x2="500" y2="320"/>
+    <g id="side-clouds"></g>
+    <g id="side-terrain"></g>
+    <g id="side-motion"></g>
+    <g id="side-aircraft"></g>
+    <g id="side-annotations"></g>
+  `;
+  const clouds = svg.querySelector('#side-clouds');
+  const cloudData = [
+    {x:60, y:80, r:20}, {x:120, y:60, r:14},
+    {x:380, y:100, r:22}, {x:430, y:75, r:16},
+    {x:200, y:50, r:12}
+  ];
+  cloudData.forEach(c => {
+    clouds.innerHTML += `<ellipse class="cloud" cx="${c.x}" cy="${c.y}" rx="${c.r}" ry="${c.r*0.5}"/>`;
+  });
+}
+
+function renderSideView(state) {
+  const svg = document.getElementById('side-svg');
+  const aircraftG = svg.querySelector('#side-aircraft');
+  const terrainG = svg.querySelector('#side-terrain');
+  const motionG = svg.querySelector('#side-motion');
+
+  const cx = 250, cy = 220;
+  const pilotY = 285;
+  const pilotX = cx + state.pilot.swingX * 25;
+
+  const pitch = state.wing.pitch;
+  const ws = state.wing;
+
+  const wingX = cx;
+  const wingY = cy;
+
+  const wingPath = buildSideWingPath(ws);
+  const wingTransform = `translate(${wingX} ${wingY}) rotate(${-pitch})`;
+
+  const lineAttachLeft = -45;
+  const lineAttachRight = 45;
+  const lineYRel = 8;
+  const cosP = Math.cos(-pitch * Math.PI / 180);
+  const sinP = Math.sin(-pitch * Math.PI / 180);
+
+  function rot(x, y) {
+    return [wingX + x * cosP - y * sinP, wingY + x * sinP + y * cosP];
+  }
+
+  const twisted = ws.riserTwist > 0.3;
+  const lines = [];
+  for (let i = 0; i < 5; i++) {
+    const lx = lineAttachLeft + (i * (lineAttachRight - lineAttachLeft) / 4);
+    const [wx, wy] = rot(lx, lineYRel);
+    let px = pilotX + (i - 2) * 2;
+    let py = pilotY - 5;
+    if (twisted) {
+      // Side-view twist: lines converge through a knot point above pilot
+      const knotY = pilotY - 28;
+      const knotX = pilotX + Math.sin(i * 1.7) * 3;
+      const cls = 'suspension-line twisted';
+      lines.push(`<line class="${cls}" x1="${wx}" y1="${wy}" x2="${knotX}" y2="${knotY}" opacity="${0.5 + ws.riserTwist*0.4}"/>`);
+      lines.push(`<line class="${cls}" x1="${knotX}" y1="${knotY}" x2="${px}" y2="${py}" opacity="${0.5 + ws.riserTwist*0.4}"/>`);
+    } else {
+      lines.push(`<line class="suspension-line" x1="${wx}" y1="${wy}" x2="${px}" y2="${py}"/>`);
+    }
+  }
+
+  const pilotHTML = buildSidePilot(pilotX, pilotY, state.pilot, ws.riserTwist);
+
+  const wingHTML = `<g transform="${wingTransform}">${wingPath}</g>`;
+
+  let motionHTML = '';
+  const fSpeed = Math.abs(state.world.forwardSpeed);
+  if (fSpeed > 5) {
+    const numLines = Math.min(8, Math.floor(fSpeed));
+    for (let i = 0; i < numLines; i++) {
+      const my = 100 + Math.random() * 200;
+      const mx1 = Math.random() * 500;
+      const len = 10 + fSpeed * 1.5;
+      motionHTML += `<line class="motion-line" x1="${mx1}" y1="${my}" x2="${mx1 - len}" y2="${my}" opacity="${0.15 + Math.random()*0.15}"/>`;
+    }
+  }
+  if (state.world.descentRate > 4) {
+    const numLines = Math.min(10, Math.floor(state.world.descentRate));
+    for (let i = 0; i < numLines; i++) {
+      const mx = Math.random() * 500;
+      const my1 = Math.random() * 300;
+      const len = 5 + state.world.descentRate;
+      motionHTML += `<line class="motion-line" x1="${mx}" y1="${my1}" x2="${mx}" y2="${my1 + len}" opacity="${0.1 + Math.random()*0.15}"/>`;
+    }
+  }
+  motionG.innerHTML = motionHTML;
+
+  const terrainMarks = 6;
+  let terrainHTML = '';
+  for (let i = 0; i < terrainMarks; i++) {
+    const tx = ((i * 90 + groundOffset) % 540) - 20;
+    const tw = 60;
+    terrainHTML += `<rect class="terrain-far" x="${tx}" y="335" width="${tw}" height="3" opacity="0.4"/>`;
+    terrainHTML += `<rect class="terrain-far" x="${tx + 10}" y="345" width="${tw - 20}" height="2" opacity="0.3"/>`;
+  }
+  terrainG.innerHTML = terrainHTML;
+
+  aircraftG.innerHTML = lines.join('') + wingHTML + pilotHTML;
+}
+
+function buildSideWingPath(ws) {
+  if (ws.horseshoe > 0.3) {
+    const h = ws.horseshoe;
+    return `
+      <path class="wing-shape" d="M -50 0 Q -55 -15 -40 -20 Q -20 -25 0 -20 Q 20 -25 40 -20 Q 55 -15 50 0 Q 45 5 30 8 Q 0 -2 -30 8 Q -45 5 -50 0 Z"
+            opacity="${0.5 + h*0.5}"/>
+      <path class="wing-cell-line" d="M -40 -20 L -40 5 M -20 -22 L -20 6 M 0 -20 L 0 -2 M 20 -22 L 20 6 M 40 -20 L 40 5"/>
+    `;
+  }
+  if (ws.bStall > 0.3) {
+    const b = ws.bStall;
+    const h = 18 - b * 10;
+    return `
+      <path class="wing-shape" d="M -55 0 Q -55 -${h*0.5} -45 -${h*0.7} Q -25 -${h} -5 -${h*0.9} Q 25 -${h*0.6} 50 -${h*0.3} Q 55 0 50 ${h*0.15} Q 0 ${h*0.1} -50 ${h*0.1} Z"/>
+      <path class="wing-cell-line" d="M -45 -${h*0.7} L -45 ${h*0.1} M -25 -${h} L -25 ${h*0.1} M -5 -${h*0.9} L -5 ${h*0.05} M 25 -${h*0.6} L 25 ${h*0.1} M 45 -${h*0.3} L 45 ${h*0.1}"/>
+      <path d="M -50 -${h*0.5} L -50 -${h*0.5 - 4} M -25 -${h*0.95} L -25 -${h*0.95 - 5} M 0 -${h*0.85} L 0 -${h*0.85 - 5} M 25 -${h*0.55} L 25 -${h*0.55 - 4}" stroke="#e8b04e" stroke-width="1" fill="none" opacity="${b}"/>
+    `;
+  }
+  if (ws.frontal > 0.3) {
+    const f = ws.frontal;
+    return `
+      <path class="wing-shape" d="M -50 0 Q -50 -${10*(1-f)} -30 -${15*(1-f)} L -15 -${5*(1-f)} L -20 ${5*f} L -40 ${6*f} Q -45 ${4*f} -50 0 M -10 -${14*(1-f)} Q 10 -${18*(1-f)} 30 -${14*(1-f)} Q 50 -8 55 0 Q 50 6 30 8 Q 10 5 -10 5 Z"/>
+      <path class="wing-cell-line" d="M -30 -${15*(1-f)} L -30 ${6*f} M -10 -${14*(1-f)} L -10 5 M 10 -${17*(1-f)} L 10 5 M 30 -${14*(1-f)} L 30 8"/>
+    `;
+  }
+  if (ws.paraStall > 0.3) {
+    const p = ws.paraStall;
+    return `
+      <path class="wing-shape" d="M -52 0 Q -52 -${15-p*2} -35 -${18-p*1} Q -10 -${21-p*2} 15 -${19-p*1} Q 40 -${15-p*1} 52 -5 Q 52 ${2+p*2} 30 ${4+p*2} Q 0 ${1+p*2} -30 ${5+p*3} Q -50 ${4+p*2} -52 0 Z" opacity="${0.85 - p*0.15}"/>
+      <path class="wing-cell-line" d="M -35 -${18-p} L -35 ${5+p*2} M -15 -${21-p*2} L -15 ${4+p*2} M 5 -${20-p*2} L 5 ${3+p*2} M 25 -${17-p} L 25 ${3+p*2} M 45 -${10} L 45 ${3}"/>
+      <text x="0" y="-30" text-anchor="middle" class="annotation" opacity="${p}">NO FLOW</text>
+    `;
+  }
+  return `
+    <path class="wing-shape" d="M -50 0 Q -50 -16 -30 -19 Q -10 -22 10 -20 Q 30 -18 50 -12 Q 56 -5 50 2 Q 25 6 0 4 Q -25 5 -50 0 Z"/>
+    <path class="wing-cell-line" d="M -30 -19 L -30 3 M -10 -22 L -10 4 M 10 -20 L 10 4 M 30 -18 L 30 5"/>
+    <ellipse cx="-45" cy="-8" rx="3" ry="6" fill="rgba(0,0,0,0.3)"/>
+  `;
+}
+
+function buildSidePilot(x, y, p, riserTwist) {
+  const speedBarOffset = p.speedBar * 6;
+  const cb = p.cBrake || 0;
+  // When using C-brake risers (reaching up), arms go higher and inward
+  const armUpL = cb > 0.1;
+  const armUpR = cb > 0.1;
+  const armEndLX = armUpL ? -4 - cb*2 : -12 - p.brakeL*4;
+  const armEndLY = armUpL ? -18 - cb*6 : 0 + p.brakeL * 12;
+  const armEndRX = armUpR ? 4 + cb*2 : 12 + p.brakeR*4;
+  const armEndRY = armUpR ? -18 - cb*6 : 0 + p.brakeR * 12;
+
+  return `
+    <g transform="translate(${x} ${y})">
+      <path class="pilot-body" d="M -10 0 Q -12 -8 -8 -12 L 8 -12 Q 12 -8 10 0 L 12 8 L -12 8 Z"/>
+      <path class="pilot-body" d="M -8 6 L 18 4 L 22 ${8 + speedBarOffset} L 8 ${10 + speedBarOffset} Z" opacity="0.9"/>
+      <circle class="pilot-head" cx="0" cy="-18" r="5"/>
+      <path d="M -5 -18 Q 0 -23 5 -18" stroke="#3a2818" stroke-width="1.5" fill="none"/>
+      <line x1="-8" y1="-8" x2="${armEndLX}" y2="${armEndLY}" stroke="#c14747" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="8" y1="-8" x2="${armEndRX}" y2="${armEndRY}" stroke="#c14747" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+  `;
+}
+
+// --- FRONT VIEW ---
+function buildFrontViewSVG() {
+  const svg = document.getElementById('front-svg');
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="sky-gradient-f" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#1a2840"/>
+        <stop offset="50%" stop-color="#2e4870"/>
+        <stop offset="100%" stop-color="#486d9c"/>
+      </linearGradient>
+      <linearGradient id="ground-gradient-f" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#3a2f25"/>
+        <stop offset="100%" stop-color="#1a1208"/>
+      </linearGradient>
+    </defs>
+    <rect x="0" y="0" width="400" height="320" fill="url(#sky-gradient-f)"/>
+    <rect x="0" y="320" width="400" height="80" fill="url(#ground-gradient-f)"/>
+    <line class="horizon-line" x1="0" y1="320" x2="400" y2="320"/>
+    <g id="front-aircraft"></g>
+    <g id="front-yaw-indicator"></g>
+    <g id="front-motion"></g>
+  `;
+}
+
+function renderFrontView(state) {
+  const svg = document.getElementById('front-svg');
+  const aircraftG = svg.querySelector('#front-aircraft');
+  const yawG = svg.querySelector('#front-yaw-indicator');
+  const motionG = svg.querySelector('#front-motion');
+
+  const cx = 200, cy = 150;
+  const pilotX = cx + state.pilot.lean * 10;
+  const pilotY = 280;
+
+  const roll = state.wing.roll;
+  const ws = state.wing;
+
+  const wingPath = buildFrontWingPath(ws);
+  const wingTransform = `translate(${cx} ${cy}) rotate(${roll})`;
+
+  const cosR = Math.cos(roll * Math.PI / 180);
+  const sinR = Math.sin(roll * Math.PI / 180);
+
+  const numLines = 7;
+  const wingSpan = 130;
+  const twisted = ws.riserTwist > 0.3;
+  const twistAmt = ws.riserTwist;
+  let lines = '';
+  for (let i = 0; i < numLines; i++) {
+    const t = i / (numLines - 1);
+    const lx = lerp(-wingSpan, wingSpan, t);
+
+    let attachX = lx;
+    let attachY = Math.abs(lx) > wingSpan * 0.6 ? 8 : 4;
+
+    if (lx < -wingSpan * 0.7 && ws.leftEar > 0) {
+      attachX = lerp(lx, -wingSpan * 0.65, ws.leftEar * 0.7);
+      attachY += ws.leftEar * 18;
+    }
+    if (lx > wingSpan * 0.7 && ws.rightEar > 0) {
+      attachX = lerp(lx, wingSpan * 0.65, ws.rightEar * 0.7);
+      attachY += ws.rightEar * 18;
+    }
+    if (lx < -wingSpan * 0.55 && ws.leftEar > 1) {
+      attachX = lerp(lx, -wingSpan * 0.5, (ws.leftEar - 1) * 0.7);
+      attachY += (ws.leftEar - 1) * 15;
+    }
+    if (lx > wingSpan * 0.55 && ws.rightEar > 1) {
+      attachX = lerp(lx, wingSpan * 0.5, (ws.rightEar - 1) * 0.7);
+      attachY += (ws.rightEar - 1) * 15;
+    }
+
+    if (lx < 0 && ws.leftCol > 0) {
+      attachX = lerp(lx, -10, ws.leftCol * 0.7);
+      attachY += ws.leftCol * 25;
+    }
+    if (lx > 0 && ws.rightCol > 0) {
+      attachX = lerp(lx, 10, ws.rightCol * 0.7);
+      attachY += ws.rightCol * 25;
+    }
+
+    const rotX = attachX * cosR - attachY * sinR;
+    const rotY = attachX * sinR + attachY * cosR;
+    const lineStartX = cx + rotX;
+    const lineStartY = cy + rotY;
+
+    const lineEndX = pilotX + (t - 0.5) * 6;
+    const lineEndY = pilotY - 5;
+
+    if (twisted) {
+      // Lines converge through a twist point ~60% down toward pilot
+      const twistMidY = cy + (pilotY - cy) * 0.6;
+      const twistMidX = pilotX + Math.sin(i * 2.3 + twistAmt * 3) * (3 + twistAmt * 4);
+      const cls = 'suspension-line twisted';
+      lines += `<line class="${cls}" x1="${lineStartX}" y1="${lineStartY}" x2="${twistMidX}" y2="${twistMidY}" opacity="${0.5 + twistAmt*0.4}"/>`;
+      lines += `<line class="${cls}" x1="${twistMidX}" y1="${twistMidY}" x2="${lineEndX}" y2="${lineEndY}" opacity="${0.5 + twistAmt*0.4}"/>`;
+    } else {
+      lines += `<line class="suspension-line" x1="${lineStartX}" y1="${lineStartY}" x2="${lineEndX}" y2="${lineEndY}"/>`;
+    }
+  }
+
+  // Twist knot indicator
+  if (twisted) {
+    const twistMidY = cy + (pilotY - cy) * 0.6;
+    lines += `<circle cx="${pilotX}" cy="${twistMidY}" r="${3 + twistAmt*2}" fill="#5a4030" stroke="#3a2818" stroke-width="0.5" opacity="${twistAmt}"/>`;
+    lines += `<text x="${pilotX + 18}" y="${twistMidY - 4}" class="annotation" fill="#e15a5a" opacity="${twistAmt}">RISER TWIST</text>`;
+    lines += `<line x1="${pilotX + 4}" y1="${twistMidY - 2}" x2="${pilotX + 16}" y2="${twistMidY - 6}" class="annotation-line" stroke="#e15a5a" opacity="${twistAmt}"/>`;
+  }
+
+  const pilotHTML = buildFrontPilot(pilotX, pilotY, state.pilot);
+  const wingHTML = `<g transform="${wingTransform}">${wingPath}</g>`;
+  aircraftG.innerHTML = lines + wingHTML + pilotHTML;
+
+  let yawHTML = '';
+  if (Math.abs(state.world.yawRate) > 15) {
+    const dir = state.world.yawRate > 0 ? 1 : -1;
+    const intensity = Math.min(1, Math.abs(state.world.yawRate) / 300);
+    const radius = 22;
+    const arcLen = 0.7 + intensity * 0.2;
+    const startAngle = (yawOffset * 0.5) % (Math.PI * 2);
+    const endAngle = startAngle + arcLen * Math.PI * 2 * dir;
+    const ax1 = 50 + Math.cos(startAngle) * radius;
+    const ay1 = 50 + Math.sin(startAngle) * radius;
+    const ax2 = 50 + Math.cos(endAngle) * radius;
+    const ay2 = 50 + Math.sin(endAngle) * radius;
+    const largeArc = arcLen > 0.5 ? 1 : 0;
+    const sweep = dir > 0 ? 1 : 0;
+    yawHTML = `
+      <circle cx="50" cy="50" r="${radius}" stroke="rgba(232,176,78,0.2)" stroke-width="1" fill="none"/>
+      <path d="M ${ax1} ${ay1} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${ax2} ${ay2}" class="yaw-indicator"/>
+      <polygon class="yaw-arrow" points="${ax2 - 4*Math.cos(endAngle - dir*0.3)} ${ay2 - 4*Math.sin(endAngle - dir*0.3)} ${ax2} ${ay2} ${ax2 - 4*Math.cos(endAngle + dir*0.3)} ${ay2 - 4*Math.sin(endAngle + dir*0.3)}"/>
+      <text x="50" y="92" text-anchor="middle" class="annotation">YAW ${Math.round(Math.abs(state.world.yawRate))}°/s</text>
+    `;
+  }
+  yawG.innerHTML = yawHTML;
+
+  let motionHTML = '';
+  if (state.world.descentRate > 4) {
+    const numL = Math.min(10, Math.floor(state.world.descentRate));
+    for (let i = 0; i < numL; i++) {
+      const mx = Math.random() * 400;
+      const my = Math.random() * 300;
+      const len = 4 + state.world.descentRate * 0.8;
+      motionHTML += `<line class="motion-line" x1="${mx}" y1="${my}" x2="${mx}" y2="${my + len}" opacity="${0.1 + Math.random()*0.15}"/>`;
+    }
+  }
+  motionG.innerHTML = motionHTML;
+}
+
+function buildFrontWingPath(ws) {
+  const span = 130;
+  const tipDrop = 18;
+  const arcRise = 28;
+
+  let leftTipX = -span;
+  let leftTipY = tipDrop;
+  let rightTipX = span;
+  let rightTipY = tipDrop;
+
+  let topY = -arcRise;
+
+  let leftEarBendX = -span * 0.6;
+  let leftEarBendY = 0;
+  let rightEarBendX = span * 0.6;
+  let rightEarBendY = 0;
+
+  if (ws.leftEar > 0) {
+    const e = Math.min(1, ws.leftEar);
+    leftTipX = lerp(-span, -span * 0.55, e);
+    leftTipY = lerp(tipDrop, tipDrop + 22, e);
+    leftEarBendY = lerp(0, 12, e);
+  }
+  if (ws.leftEar > 1) {
+    const e2 = ws.leftEar - 1;
+    leftTipX = lerp(leftTipX, -span * 0.4, e2);
+    leftTipY = lerp(leftTipY, leftTipY + 14, e2);
+    leftEarBendY = lerp(leftEarBendY, leftEarBendY + 12, e2);
+  }
+  if (ws.rightEar > 0) {
+    const e = Math.min(1, ws.rightEar);
+    rightTipX = lerp(span, span * 0.55, e);
+    rightTipY = lerp(tipDrop, tipDrop + 22, e);
+    rightEarBendY = lerp(0, 12, e);
+  }
+  if (ws.rightEar > 1) {
+    const e2 = ws.rightEar - 1;
+    rightTipX = lerp(rightTipX, span * 0.4, e2);
+    rightTipY = lerp(rightTipY, rightTipY + 14, e2);
+    rightEarBendY = lerp(rightEarBendY, rightEarBendY + 12, e2);
+  }
+
+  let leftHalfCollapse = ws.leftCol;
+  let rightHalfCollapse = ws.rightCol;
+
+  let flatten = ws.bStall;
+  topY = lerp(topY, topY * 0.4, flatten);
+
+  let pathD;
+
+  if (leftHalfCollapse > 0.3 || rightHalfCollapse > 0.3) {
+    pathD = buildAsymmetricCollapsePath(span, tipDrop, arcRise, leftHalfCollapse, rightHalfCollapse);
+  } else if (ws.frontal > 0.3) {
+    const f = ws.frontal;
+    const sag = lerp(0, 18, f);
+    pathD = `M ${leftTipX} ${leftTipY}
+             Q ${leftEarBendX} ${leftEarBendY - 5 + sag * 0.5}
+               ${-span * 0.3} ${topY + sag}
+             Q 0 ${topY + sag * 1.2}
+               ${span * 0.3} ${topY + sag}
+             Q ${rightEarBendX} ${rightEarBendY - 5 + sag * 0.5}
+               ${rightTipX} ${rightTipY}
+             Q ${rightTipX * 0.8} ${rightTipY + 4 - sag * 0.3}
+               0 ${4 - sag * 0.4}
+             Q ${leftTipX * 0.8} ${leftTipY + 4 - sag * 0.3}
+               ${leftTipX} ${leftTipY} Z`;
+  } else if (ws.horseshoe > 0.3) {
+    const h = ws.horseshoe;
+    const tipForward = lerp(0, 15, h);
+    pathD = `M ${leftTipX + tipForward * 0.3} ${leftTipY - tipForward}
+             Q ${leftEarBendX} ${leftEarBendY - tipForward * 0.5}
+               ${-span * 0.3} ${topY * 0.6}
+             Q 0 ${topY * 0.5}
+               ${span * 0.3} ${topY * 0.6}
+             Q ${rightEarBendX} ${rightEarBendY - tipForward * 0.5}
+               ${rightTipX - tipForward * 0.3} ${rightTipY - tipForward}
+             Q ${rightTipX * 0.85} ${rightTipY + 4 - tipForward * 0.3}
+               0 ${6}
+             Q ${leftTipX * 0.85} ${leftTipY + 4 - tipForward * 0.3}
+               ${leftTipX + tipForward * 0.3} ${leftTipY - tipForward} Z`;
+  } else {
+    pathD = `M ${leftTipX} ${leftTipY}
+             Q ${leftEarBendX} ${leftEarBendY - 8}
+               ${-span * 0.3} ${topY}
+             Q 0 ${topY - 4}
+               ${span * 0.3} ${topY}
+             Q ${rightEarBendX} ${rightEarBendY - 8}
+               ${rightTipX} ${rightTipY}
+             Q ${rightTipX * 0.85} ${rightTipY + 4}
+               0 ${-2}
+             Q ${leftTipX * 0.85} ${leftTipY + 4}
+               ${leftTipX} ${leftTipY} Z`;
+  }
+
+  let cellLines = '';
+  const numCells = 13;
+  for (let i = 1; i < numCells; i++) {
+    const t = i / numCells;
+    const x = lerp(leftTipX, rightTipX, t);
+    let yTop;
+    if (t < 0.15) yTop = lerp(leftTipY, leftEarBendY - 8, t / 0.15);
+    else if (t < 0.85) yTop = lerp(leftEarBendY - 8, rightEarBendY - 8, (t - 0.15) / 0.7);
+    else yTop = lerp(rightEarBendY - 8, rightTipY, (t - 0.85) / 0.15);
+    if (t > 0.3 && t < 0.7) yTop = Math.min(yTop, topY);
+
+    if (t < 0.5 && leftHalfCollapse > 0.5) continue;
+    if (t > 0.5 && rightHalfCollapse > 0.5) continue;
+
+    cellLines += `<line class="wing-cell-line" x1="${x}" y1="${yTop}" x2="${x}" y2="${yTop + 6}"/>`;
+  }
+
+  let cravatteHTML = '';
+  if (ws.cravatte > 0.3) {
+    const c = ws.cravatte;
+    const knotX = rightTipX - 12;
+    const knotY = rightTipY - 6;
+    cravatteHTML = `
+      <g opacity="${c}">
+        <path d="M ${knotX} ${knotY} q -6 -4 0 -8 q 6 -4 6 4 q 0 6 -6 4 z" fill="#5a4030" stroke="#3a2818" stroke-width="0.5"/>
+        <circle cx="${knotX + 2}" cy="${knotY - 2}" r="2" fill="#3a2818"/>
+        <text x="${knotX + 12}" y="${knotY - 8}" class="annotation" fill="#e15a5a">CRAVATTE</text>
+        <line x1="${knotX + 8}" y1="${knotY - 4}" x2="${knotX + 14}" y2="${knotY - 12}" class="annotation-line" stroke="#e15a5a"/>
+      </g>
+    `;
+  }
+
+  let paraHTML = '';
+  if (ws.paraStall > 0.4) {
+    paraHTML = `<text x="0" y="-40" text-anchor="middle" class="annotation" opacity="${ws.paraStall}">↓ NO FORWARD FLOW ↓</text>`;
+  }
+
+  return `
+    <path class="wing-shape" d="${pathD}"/>
+    ${cellLines}
+    ${cravatteHTML}
+    ${paraHTML}
+  `;
+}
+
+function buildAsymmetricCollapsePath(span, tipDrop, arcRise, leftCol, rightCol) {
+  if (leftCol > 0.5) {
+    return `M ${-span * 0.15} ${10}
+            Q ${-span * 0.05} ${-12}
+              ${span * 0.3} ${-arcRise}
+            Q ${span * 0.6} ${-8}
+              ${span} ${tipDrop}
+            Q ${span * 0.85} ${tipDrop + 4}
+              0 ${4}
+            Q ${-span * 0.1} ${15}
+              ${-span * 0.15} ${10}
+            M ${-span * 0.2} ${12}
+            q -8 -4 -16 4
+            q -8 8 -4 16
+            q 4 4 8 0
+            q 0 -8 -4 -12 Z`;
+  } else if (rightCol > 0.5) {
+    return `M ${-span} ${tipDrop}
+            Q ${-span * 0.6} ${-8}
+              ${-span * 0.3} ${-arcRise}
+            Q ${-span * 0.05} ${-12}
+              ${span * 0.15} ${10}
+            Q ${-span * 0.1} ${15}
+              0 ${4}
+            Q ${-span * 0.85} ${tipDrop + 4}
+              ${-span} ${tipDrop}
+            M ${span * 0.2} ${12}
+            q 8 -4 16 4
+            q 8 8 4 16
+            q -4 4 -8 0
+            q 0 -8 4 -12 Z`;
+  }
+  return `M ${-span} ${tipDrop} Q 0 ${-arcRise} ${span} ${tipDrop} Q 0 ${tipDrop * 0.3} ${-span} ${tipDrop} Z`;
+}
+
+function buildFrontPilot(x, y, p) {
+  const armR = p.brakeR;
+  const armL = p.brakeL;
+  const cb = p.cBrake || 0;
+  // C-riser pull: arms go straight up (above twist)
+  const cbL = cb;
+  const cbR = cb;
+  const armEndLX = cbL > 0.1 ? -8 : (-14 - armL*2);
+  const armEndLY = cbL > 0.1 ? (-22 - cbL*12) : (-2 + armL*12);
+  const armEndRX = cbR > 0.1 ? 8 : (14 + armR*2);
+  const armEndRY = cbR > 0.1 ? (-22 - cbR*12) : (-2 + armR*12);
+
+  return `
+    <g transform="translate(${x} ${y})">
+      <path class="pilot-body" d="M -12 -10 Q -14 0 -10 12 L 10 12 Q 14 0 12 -10 Z"/>
+      <circle class="pilot-head" cx="0" cy="-18" r="6"/>
+      <path d="M -6 -18 Q 0 -24 6 -18" stroke="#3a2818" stroke-width="1.5" fill="none"/>
+      <line x1="-10" y1="-6" x2="${armEndLX}" y2="${armEndLY}" stroke="#c14747" stroke-width="3" stroke-linecap="round"/>
+      <line x1="10" y1="-6" x2="${armEndRX}" y2="${armEndRY}" stroke="#c14747" stroke-width="3" stroke-linecap="round"/>
+      <line x1="-4" y1="12" x2="-6" y2="22" stroke="#3a2818" stroke-width="3" stroke-linecap="round"/>
+      <line x1="4" y1="12" x2="6" y2="22" stroke="#3a2818" stroke-width="3" stroke-linecap="round"/>
+      ${p.speedBar > 0.1 ? `<line x1="-10" y1="${22 + p.speedBar*4}" x2="10" y2="${22 + p.speedBar*4}" stroke="#e8b04e" stroke-width="1.5"/>` : ''}
+    </g>
+  `;
+}
+
+// --- INSTRUMENTS ---
+function updateInstruments(state) {
+  document.getElementById('instr-descent').innerHTML =
+    `-${state.world.descentRate.toFixed(1)}<span class="instrument-unit">m/s</span>`;
+  const desc = document.getElementById('instr-descent');
+  desc.className = 'instrument-value' + (state.world.descentRate > 10 ? ' danger' : state.world.descentRate > 4 ? ' warn' : '');
+
+  document.getElementById('instr-bank').textContent = `${Math.round(state.wing.roll)}°`;
+  const bk = document.getElementById('instr-bank');
+  bk.className = 'instrument-value' + (Math.abs(state.wing.roll) > 60 ? ' danger' : Math.abs(state.wing.roll) > 30 ? ' warn' : '');
+
+  document.getElementById('instr-pitch').textContent = `${Math.round(state.wing.pitch)}°`;
+
+  document.getElementById('instr-g').innerHTML =
+    `${state.world.gLoad.toFixed(1)}<span class="instrument-unit">g</span>`;
+  const g = document.getElementById('instr-g');
+  g.className = 'instrument-value' + (state.world.gLoad > 3 ? ' danger' : state.world.gLoad > 2 ? ' warn' : '');
+}
+
+// --- TIMELINE ---
+function buildTimeline(maneuver) {
+  const track = document.getElementById('timeline-track');
+  track.innerHTML = maneuver.phases.map((p, i) =>
+    `<div class="timeline-phase" data-idx="${i}">
+       <div class="timeline-phase-fill"></div>
+       <div class="timeline-phase-label">${(i+1).toString().padStart(2,'0')}</div>
+     </div>`
+  ).join('');
+
+  track.querySelectorAll('.timeline-phase').forEach(el => {
+    el.addEventListener('click', () => {
+      currentPhaseIndex = parseInt(el.dataset.idx);
+      phaseElapsed = 0;
+      updateUIForPhase();
+    });
+  });
+}
+
+function updateTimelineProgress(maneuver, phaseIdx, phaseT) {
+  const phases = document.querySelectorAll('.timeline-phase');
+  phases.forEach((el, i) => {
+    el.classList.remove('active', 'completed');
+    const fill = el.querySelector('.timeline-phase-fill');
+    if (i < phaseIdx) {
+      el.classList.add('completed');
+      fill.style.width = '100%';
+    } else if (i === phaseIdx) {
+      el.classList.add('active');
+      fill.style.width = `${phaseT * 100}%`;
+    } else {
+      fill.style.width = '0%';
+    }
+  });
+}
+
+// --- DESCRIPTION ---
+function updateDescription(maneuver, phaseIdx) {
+  const phase = maneuver.phases[phaseIdx];
+  document.getElementById('phase-name').textContent = phase.name;
+  document.getElementById('phase-text').textContent = phase.text;
+  document.getElementById('phase-progress').textContent =
+    `${(phaseIdx + 1).toString().padStart(2, '0')} / ${maneuver.phases.length.toString().padStart(2, '0')}`;
+}
+
+function updateManeuverHeader(maneuver) {
+  document.getElementById('man-title').textContent = maneuver.name;
+  document.getElementById('man-tagline').textContent = maneuver.tagline;
+  const ruleCard = document.getElementById('rule-card');
+  const ruleText = document.getElementById('rule-text');
+  if (maneuver.rule) {
+    ruleText.textContent = maneuver.rule;
+    ruleCard.classList.add('visible');
+  } else {
+    ruleCard.classList.remove('visible');
+  }
+}
+
+// --- SIDEBAR ---
+function buildSidebar() {
+  const container = document.getElementById('maneuver-categories');
+  let html = '';
+  for (const cat of CATEGORIES) {
+    html += `<div class="category">
+      <div class="category-label">${cat.name}</div>
+      <ul class="maneuver-list">`;
+    for (const id of cat.maneuvers) {
+      const m = MANEUVERS[id];
+      html += `<li><button class="maneuver-item" data-id="${id}">${m.name}</button></li>`;
+    }
+    html += `</ul></div>`;
+  }
+  container.innerHTML = html;
+
+  container.querySelectorAll('.maneuver-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      selectManeuver(id);
+    });
+  });
+}
+
+function highlightActive() {
+  document.querySelectorAll('.maneuver-item').forEach(b => {
+    b.classList.toggle('active', b.dataset.id === currentManeuverId);
+  });
+}
+
+// --- MANEUVER SELECTION ---
+function selectManeuver(id) {
+  currentManeuverId = id;
+  currentPhaseIndex = 0;
+  phaseElapsed = 0;
+  groundOffset = 0;
+  yawOffset = 0;
+  const m = MANEUVERS[id];
+  updateManeuverHeader(m);
+  buildTimeline(m);
+  updateUIForPhase();
+  highlightActive();
+  playing = true;
+  document.getElementById('btn-play').textContent = '❚❚ Pause';
+}
+
+function updateUIForPhase() {
+  const m = MANEUVERS[currentManeuverId];
+  updateDescription(m, currentPhaseIndex);
+  const absStates = buildAbsoluteStates(m);
+  renderState = deepClone(absStates[currentPhaseIndex]);
+  renderFrame();
+}
+
+// --- ANIMATION LOOP ---
+function renderFrame() {
+  const m = MANEUVERS[currentManeuverId];
+  const absStates = buildAbsoluteStates(m);
+
+  const phase = m.phases[currentPhaseIndex];
+  const phaseT = clamp(phaseElapsed / phase.duration, 0, 1);
+  const fromState = absStates[currentPhaseIndex];
+  const toState = absStates[currentPhaseIndex + 1];
+  renderState = interpolateState(fromState, toState, phaseT);
+
+  renderSideView(renderState);
+  renderFrontView(renderState);
+  updateInstruments(renderState);
+  updateTimelineProgress(m, currentPhaseIndex, phaseT);
+}
+
+function tick(now) {
+  if (!lastFrameTime) lastFrameTime = now;
+  const dt = (now - lastFrameTime) * speed;
+  lastFrameTime = now;
+
+  if (playing) {
+    const m = MANEUVERS[currentManeuverId];
+    phaseElapsed += dt;
+
+    groundOffset += renderState.world.forwardSpeed * dt * 0.015;
+    yawOffset += renderState.world.yawRate * dt * 0.0001;
+
+    if (phaseElapsed >= m.phases[currentPhaseIndex].duration) {
+      phaseElapsed = 0;
+      currentPhaseIndex++;
+      if (currentPhaseIndex >= m.phases.length) {
+        currentPhaseIndex = 0;
+      }
+      updateDescription(m, currentPhaseIndex);
+    }
+  }
+
+  renderFrame();
+  requestAnimationFrame(tick);
+}
+
+// --- CONTROLS ---
+function setupControls() {
+  document.getElementById('btn-play').addEventListener('click', () => {
+    playing = !playing;
+    document.getElementById('btn-play').textContent = playing ? '❚❚ Pause' : '▶ Play';
+  });
+
+  document.getElementById('btn-restart').addEventListener('click', () => {
+    currentPhaseIndex = 0;
+    phaseElapsed = 0;
+    groundOffset = 0;
+    yawOffset = 0;
+    updateUIForPhase();
+    playing = true;
+    document.getElementById('btn-play').textContent = '❚❚ Pause';
+  });
+
+  document.querySelectorAll('.speed-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      speed = parseFloat(btn.dataset.speed);
+    });
+  });
+}
+
+// --- INIT ---
+function init() {
+  buildSideViewSVG();
+  buildFrontViewSVG();
+  buildSidebar();
+  setupControls();
+  selectManeuver('pitch_control');
+  requestAnimationFrame(tick);
+}
+
+init();
+</script>
+</body>
+</html>
